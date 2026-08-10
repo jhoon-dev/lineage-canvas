@@ -1,0 +1,2491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>__TITLE__</title>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #ffffff;
+    --surface-muted: #f8fafc;
+    --border: #dbe1e8;
+    --border-strong: #b8c1cc;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --text-soft: #64748b;
+    --blue: #2563eb;
+    --blue-soft: #eaf2ff;
+    --orange: #ea580c;
+    --orange-soft: #fff1e8;
+    --green: #059669;
+    --focus: rgba(37, 99, 235, .22);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    overflow: hidden;
+    background: var(--surface-muted);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  label:has(input:focus-visible),
+  .node:focus {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .topbar {
+    position: relative;
+    z-index: 30;
+    flex: 0 0 auto;
+    padding: 16px 22px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    background: rgba(255, 255, 255, .98);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
+    backdrop-filter: blur(10px);
+  }
+
+  .topbar-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 12px;
+  }
+
+  .title {
+    margin: 0;
+    color: var(--text);
+    font-size: 19px;
+    font-weight: 750;
+    line-height: 1.25;
+  }
+
+  .subtitle {
+    margin-top: 4px;
+    color: var(--text-soft);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .updated-at {
+    flex: 0 0 auto;
+    color: var(--text-soft);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .updated-at strong {
+    color: #334155;
+    font-weight: 700;
+  }
+
+  .primary-row {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .search-area {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 260px;
+  }
+
+  .search-hero {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+  }
+
+  .search-hero:focus-within {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, .10);
+  }
+
+  .search-icon {
+    flex: 0 0 auto;
+    color: var(--text-soft);
+    font-size: 17px;
+  }
+
+  .search-hero input {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .search-hero input::placeholder {
+    color: #64748b;
+  }
+
+  .autocomplete {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    z-index: 60;
+    display: none;
+    max-height: min(360px, 45vh);
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, .16);
+  }
+
+  .autocomplete-item {
+    padding: 9px 11px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .autocomplete-item:last-child {
+    border-bottom: 0;
+  }
+
+  .autocomplete-item:hover,
+  .autocomplete-item.active {
+    background: #fff7ed;
+  }
+
+  .autocomplete-main {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .autocomplete-sub {
+    margin-top: 3px;
+    color: var(--text-soft);
+    font-size: 11px;
+  }
+
+  .autocomplete-mark {
+    border-radius: 3px;
+    background: #fde68a;
+  }
+
+  #suggestions {
+    color: var(--text-soft);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  #suggestions a {
+    color: #1d4ed8;
+    text-decoration: none;
+  }
+
+  #suggestions a:hover {
+    text-decoration: underline;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px 14px;
+  }
+
+  .control-cluster,
+  .view-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cluster-label {
+    color: var(--text-soft);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .segmented {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f1f5f9;
+  }
+
+  .segment {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 7px;
+    color: var(--text-soft);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+
+  .segment input {
+    position: absolute;
+    width: 1px;
+    min-width: 0;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+  }
+
+  .segment-mark {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #94a3b8;
+  }
+
+  .segment.reference.active,
+  .segment.reference:has(input:checked) {
+    background: var(--blue-soft);
+    color: #1d4ed8;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, .08);
+  }
+
+  .segment.reference.active .segment-mark,
+  .segment.reference:has(input:checked) .segment-mark {
+    background: var(--blue);
+  }
+
+  .segment.trigger.active,
+  .segment.trigger:has(input:checked) {
+    background: var(--orange-soft);
+    color: #c2410c;
+    box-shadow: 0 1px 2px rgba(234, 88, 12, .08);
+  }
+
+  .segment.trigger.active .segment-mark,
+  .segment.trigger:has(input:checked) .segment-mark {
+    background: var(--orange);
+  }
+
+  .direction-check-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 112px;
+    height: 34px;
+    padding: 0 11px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-soft);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .direction-check-btn:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-muted);
+  }
+
+  .direction-check-btn:has(input:checked) {
+    border-color: #cbd5e1;
+    background: #f1f5f9;
+    color: #334155;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .12);
+  }
+
+  .direction-check-btn input {
+    width: 14px;
+    min-width: 0;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--blue);
+    cursor: pointer;
+  }
+
+  .view-actions {
+    margin-left: auto;
+  }
+
+  .btn {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: #334155;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-muted);
+  }
+
+  .btn:disabled {
+    border-color: #e2e8f0;
+    background: #f8fafc;
+    color: #94a3b8;
+    cursor: not-allowed;
+    opacity: .72;
+  }
+
+  .btn.primary {
+    min-height: 42px;
+    padding: 0 17px;
+    border-color: var(--blue);
+    background: var(--blue);
+    color: #ffffff;
+  }
+
+  .btn.primary:hover {
+    background: #1d4ed8;
+  }
+
+  .btn.danger-ghost {
+    border-color: #fecaca;
+    color: #b91c1c;
+  }
+
+  .btn.danger-ghost:hover {
+    border-color: #fca5a5;
+    background: #fef2f2;
+  }
+
+  .icon-btn {
+    width: 34px;
+    padding: 0;
+    font-size: 16px;
+  }
+
+  .export-menu-wrap {
+    position: relative;
+  }
+
+  .export-btn {
+    min-width: 90px;
+  }
+
+  .caret {
+    margin-left: 4px;
+    color: var(--text-soft);
+  }
+
+  .export-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 70;
+    display: none;
+    min-width: 160px;
+    padding: 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, .16);
+  }
+
+  .export-menu.open {
+    display: block;
+  }
+
+  .export-menu button {
+    display: block;
+    width: 100%;
+    min-height: 34px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #334155;
+    text-align: left;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .export-menu button:hover {
+    background: var(--surface-muted);
+  }
+
+  .status-row {
+    display: flex;
+    min-height: 26px;
+    margin-top: 9px;
+  }
+
+  .toolbar-info {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    overflow-x: auto;
+    color: var(--text-soft);
+    scrollbar-width: thin;
+  }
+
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    min-height: 24px;
+    padding: 3px 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  .status-chip.selected {
+    max-width: min(420px, 42vw);
+    overflow: hidden;
+    border-color: #fed7aa;
+    background: #fff7ed;
+    color: #9a3412;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status-chip strong {
+    color: var(--text);
+    font-weight: 750;
+  }
+
+  .copy-chip {
+    gap: 5px;
+    border-color: #bfdbfe;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .copy-chip:hover {
+    border-color: #93c5fd;
+    background: #dbeafe;
+  }
+
+  .copy-chip.copied {
+    border-color: #a7f3d0;
+    background: #ecfdf5;
+    color: #047857;
+  }
+
+  .copy-toast {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 25;
+    max-width: min(520px, calc(100% - 24px));
+    padding: 9px 12px;
+    border: 1px solid #a7f3d0;
+    border-radius: 9px;
+    background: rgba(236, 253, 245, .97);
+    color: #047857;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: opacity .16s ease, transform .16s ease;
+  }
+
+  .copy-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .copy-toast.error {
+    border-color: #fecaca;
+    background: rgba(254, 242, 242, .97);
+    color: #b91c1c;
+  }
+
+  .node-tooltip {
+    position: absolute;
+    z-index: 24;
+    display: none;
+    max-width: min(380px, calc(100% - 24px));
+    max-height: min(300px, calc(100% - 24px));
+    overflow: hidden;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    background: rgba(15, 23, 42, .96);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .2);
+    color: #f8fafc;
+    font-size: 11px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+    pointer-events: none;
+  }
+
+  .node-tooltip.show {
+    display: block;
+  }
+
+  #chart-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+    background:
+      linear-gradient(rgba(148, 163, 184, .08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, .08) 1px, transparent 1px),
+      var(--surface-muted);
+    background-size: 32px 32px;
+    cursor: grab;
+    user-select: none;
+  }
+
+  #chart-wrap.panning {
+    cursor: grabbing;
+  }
+
+  #chart {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    touch-action: none;
+  }
+
+  .node {
+    cursor: pointer;
+  }
+
+  .node rect {
+    fill: #ffffff;
+    stroke: #94a3b8;
+    stroke-width: 2;
+    rx: 10;
+    filter: drop-shadow(0 2px 4px rgba(15, 23, 42, .12));
+  }
+
+  .node:hover rect,
+  .node:focus rect {
+    stroke-width: 2.8;
+    filter: drop-shadow(0 4px 8px rgba(15, 23, 42, .18));
+  }
+
+  .node.root rect {
+    stroke: #0f172a;
+    stroke-width: 3;
+  }
+
+  .node.selected rect {
+    fill: #fff7ed;
+    stroke: #f97316;
+    stroke-width: 3.5;
+  }
+
+  .node.expanded rect {
+    stroke-width: 2.8;
+  }
+
+  .node.parent rect { stroke: var(--blue); }
+  .node.child rect { stroke: var(--green); }
+  .node.mixed rect { stroke: #7c3aed; }
+  .node.type-raw rect { fill: #f1f5f9; }
+  .node.type-stg rect { fill: #eff6ff; }
+  .node.type-mart rect { fill: #ecfdf5; }
+  .node.type-rpt rect,
+  .node.type-report rect { fill: #fff7ed; }
+  .node.type-dw rect { fill: #f5f3ff; }
+  .node.type-ods rect { fill: #f0fdfa; }
+
+  .node text {
+    pointer-events: none;
+    dominant-baseline: middle;
+  }
+
+  .node .table-name {
+    fill: var(--text);
+    font-size: 14px;
+    font-weight: 750;
+  }
+
+  .node .object-meta {
+    fill: var(--text-soft);
+    font-size: 10.5px;
+  }
+
+  .node .subtext {
+    fill: var(--text-muted);
+    font-size: 10.5px;
+  }
+
+  .node .badge-text {
+    fill: #ffffff;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .node .expanded-label {
+    fill: #c2410c;
+    font-size: 9.5px;
+    font-weight: 750;
+  }
+
+  .link {
+    fill: none;
+    marker-end: url(#arrow);
+    opacity: .76;
+  }
+
+  .link.reference-link {
+    stroke: #3b82f6;
+    stroke-width: 0.8;
+  }
+
+  .link.trigger-link {
+    stroke: #f59e0b;
+    stroke-width: 0.8;
+    stroke-dasharray: 8 6;
+  }
+
+  .link.reference-link.selected-link {
+    stroke: #1d4ed8;
+    stroke-width: 1.4;
+    opacity: 1;
+  }
+
+  .link.trigger-link.selected-link {
+    stroke: #d97706;
+    stroke-width: 1.4;
+    stroke-dasharray: 8 5;
+    opacity: 1;
+  }
+
+  .graph-legend,
+  .help,
+  .minimap {
+    position: absolute;
+    z-index: 20;
+    border: 1px solid rgba(203, 213, 225, .9);
+    background: rgba(255, 255, 255, .94);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
+    backdrop-filter: blur(6px);
+  }
+
+  .graph-legend {
+    top: 12px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-line {
+    width: 24px;
+    height: 0;
+    border-top: 3px solid #3b82f6;
+  }
+
+  .legend-line.trigger {
+    border-color: #f59e0b;
+    border-top-style: dashed;
+  }
+
+  .legend-arrow {
+    color: var(--text-soft);
+    font-size: 12px;
+  }
+
+  .help {
+    bottom: 12px;
+    left: 12px;
+    max-width: calc(100% - 270px);
+    padding: 7px 10px;
+    border-radius: 9px;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .help kbd {
+    padding: 1px 4px;
+    border: 1px solid #cbd5e1;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: #f8fafc;
+    color: #334155;
+    font: inherit;
+  }
+
+  .minimap {
+    right: 12px;
+    bottom: 12px;
+    width: 220px;
+    height: 150px;
+    overflow: hidden;
+    border-radius: 10px;
+  }
+
+  .minimap-title {
+    position: absolute;
+    top: 7px;
+    left: 9px;
+    z-index: 21;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 650;
+  }
+
+  #minimap-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .minimap-node { fill: #94a3b8; opacity: .8; }
+  .minimap-selected { fill: #f97316; opacity: 1; }
+  .minimap-view { fill: rgba(249, 115, 22, .08); stroke: #f97316; stroke-width: 1.2; }
+
+  @media (max-width: 1180px) {
+    .control-row {
+      flex-wrap: wrap;
+    }
+
+    .view-actions {
+      order: 3;
+      flex: 1 1 auto;
+      margin-left: 0;
+    }
+
+    .export-menu-wrap {
+      order: 4;
+      margin-left: auto;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .topbar {
+      max-height: 56vh;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .topbar-head {
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .title {
+      font-size: 17px;
+    }
+
+    .subtitle {
+      display: none;
+    }
+
+    .updated-at {
+      font-size: 10px;
+    }
+
+    .primary-row {
+      gap: 7px;
+    }
+
+    .btn.primary {
+      padding: 0 12px;
+    }
+
+    .control-cluster {
+      flex: 1 1 100%;
+    }
+
+    .segmented {
+      flex: 1 1 auto;
+    }
+
+    .segment {
+      flex: 1 1 50%;
+      justify-content: center;
+    }
+
+    .direction-check-btn {
+      flex: 1 1 50%;
+      min-width: 0;
+    }
+
+    .view-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      width: 100%;
+    }
+
+    .view-actions .btn {
+      width: 100%;
+      padding: 0 7px;
+    }
+
+    .export-menu-wrap,
+    .export-btn {
+      width: 100%;
+    }
+
+    .export-menu {
+      right: auto;
+      left: 0;
+      width: 100%;
+    }
+
+    .status-chip.selected {
+      max-width: 72vw;
+    }
+
+    .graph-legend {
+      top: 8px;
+      left: 8px;
+    }
+
+    .help {
+      right: 8px;
+      bottom: 8px;
+      left: 8px;
+      max-width: none;
+      font-size: 10px;
+    }
+
+    .minimap {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .updated-at {
+      white-space: normal;
+      text-align: right;
+    }
+
+    .search-hero {
+      min-width: 0;
+    }
+
+    .open-btn {
+      font-size: 0;
+    }
+
+    .open-btn::after {
+      content: "Open";
+      font-size: 12px;
+    }
+
+    .view-actions {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .graph-legend {
+      gap: 8px;
+    }
+
+    .legend-arrow {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+
+
+<div class="topbar">
+  <div class="topbar-head">
+    <div>
+      <h1 class="title">__TITLE__</h1>
+      <div class="subtitle">Explore table lineage across reference and trigger relationships</div>
+    </div>
+    <div class="updated-at">Updated <strong id="dataUpdatedAt"></strong></div>
+  </div>
+
+  <div class="primary-row">
+    <div class="search-area">
+      <div class="search-hero">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="search" type="search" placeholder="Search by table, schema, or database" aria-label="Search tables" aria-autocomplete="list" aria-controls="autocomplete" aria-expanded="false" />
+      </div>
+      <div id="autocomplete" class="autocomplete" role="listbox" aria-label="Table search results"></div>
+    </div>
+    <button id="searchBtn" class="btn primary open-btn">Open table</button>
+  </div>
+
+  <div class="control-row">
+    <div class="control-cluster" role="group" aria-label="Relationship filters">
+      <span class="cluster-label">Relation</span>
+      <div class="segmented">
+        <label class="segment reference active" id="referenceToggle">
+          <input type="checkbox" id="showReference" checked>
+          <span class="segment-mark"></span>
+          <span>Reference</span>
+        </label>
+        <label class="segment trigger active" id="triggerToggle">
+          <input type="checkbox" id="showTrigger" checked>
+          <span class="segment-mark"></span>
+          <span>Trigger</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="control-cluster" role="group" aria-label="Direction filters">
+      <span class="cluster-label">Direction</span>
+      <label class="direction-check-btn" id="parentsToggle">
+        <input type="checkbox" id="showParents" checked>
+        <span>Upstream</span>
+      </label>
+      <label class="direction-check-btn" id="childrenToggle">
+        <input type="checkbox" id="showChildren" checked>
+        <span>Downstream</span>
+      </label>
+    </div>
+
+    <div class="view-actions">
+      <button id="expandUpBtn" class="btn" title="Expand all upstream tables">Expand upstream</button>
+      <button id="collapseBtn" class="btn" title="Collapse the selected table">Collapse</button>
+      <button id="fitBtn" class="btn" title="Fit all visible tables in the graph">Fit graph</button>
+      <button id="resetViewBtn" class="btn" title="Reset zoom to 100% and center the visible graph">Reset view</button>
+      <button id="resetGraphBtn" class="btn danger-ghost" title="Reset the graph to the current root table">Reset graph</button>
+      <button id="zoomInBtn" class="btn icon-btn" title="Zoom in" aria-label="Zoom in">＋</button>
+      <button id="zoomOutBtn" class="btn icon-btn" title="Zoom out" aria-label="Zoom out">－</button>
+    </div>
+
+    <div class="export-menu-wrap">
+      <button id="exportMenuBtn" class="btn export-btn" aria-haspopup="menu" aria-controls="exportMenu" aria-expanded="false">Export <span class="caret" aria-hidden="true">▾</span></button>
+      <div id="exportMenu" class="export-menu" role="menu">
+        <button id="exportVisibleBtn" role="menuitem">Visible XLSX</button>
+        <button id="exportAllBtn" role="menuitem">All XLSX</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-row">
+    <div id="info" class="toolbar-info" role="status" aria-live="polite"></div>
+  </div>
+
+  <div id="suggestions"></div>
+</div>
+<main id="chart-wrap" aria-label="Interactive table lineage graph">
+  <svg id="chart" role="img" aria-label="Interactive table lineage graph" aria-describedby="graphDescription">
+    <desc id="graphDescription">Use the mouse to pan and zoom. Select a table node to expand or collapse its relationships.</desc>
+    <g id="viewport"></g>
+  </svg>
+  <div class="graph-legend" aria-label="Relationship legend">
+    <span class="legend-item"><i class="legend-line"></i>Reference</span>
+    <span class="legend-item"><i class="legend-line trigger"></i>Trigger</span>
+    <span class="legend-arrow">Arrow points downstream</span>
+  </div>
+  <div class="minimap" aria-hidden="true">
+    <div class="minimap-title">Mini map</div>
+    <svg id="minimap-svg"></svg>
+  </div>
+  <div id="copyToast" class="copy-toast" role="status" aria-live="polite"></div>
+  <div id="nodeTooltip" class="node-tooltip" role="tooltip"></div>
+  <div class="help"><kbd>Drag</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>Click</kbd> expand/collapse · <kbd>Shift+Click</kbd> copy name · <kbd>Ctrl/Cmd+C</kbd> copy selected · <kbd>Ctrl+Click</kbd> new root · <kbd>Double-click</kbd> expand upstream</div>
+</main>
+
+<script>
+const PAYLOAD = __PAYLOAD__;
+const DATA = PAYLOAD.data;
+const MAX_NEIGHBORS = PAYLOAD.max_neighbors_per_click || 80;
+const AUTO_DEPTH = PAYLOAD.upstream_auto_depth || 12;
+const DATA_UPDATED_AT = PAYLOAD.data_updated_at || '-';
+document.getElementById('dataUpdatedAt').textContent = DATA_UPDATED_AT;
+
+let rootTable = PAYLOAD.initial_table;
+let selectedTable = PAYLOAD.initial_table;
+
+let visibleNodes = new Set();
+let visibleEdges = new Map();
+let expandedNodes = new Set();
+let upstreamExpandedNodes = new Set();
+let downstreamExpandedNodes = new Set();
+let nodePos = new Map();
+let nodeKind = new Map();
+
+const svg = document.getElementById('chart');
+const viewport = document.getElementById('viewport');
+const minimapSvg = document.getElementById('minimap-svg');
+const wrap = document.getElementById('chart-wrap');
+const searchInput = document.getElementById('search');
+const info = document.getElementById('info');
+const copyToast = document.getElementById('copyToast');
+const nodeTooltipEl = document.getElementById('nodeTooltip');
+const suggestions = document.getElementById('suggestions');
+const autocomplete = document.getElementById('autocomplete');
+let autocompleteMatches = [];
+let autocompleteIndex = -1;
+const showParentsEl = document.getElementById('showParents');
+const showChildrenEl = document.getElementById('showChildren');
+const showReferenceEl = document.getElementById('showReference');
+const showTriggerEl = document.getElementById('showTrigger');
+
+const NODE_W = 280;
+const NODE_H = 76;
+const COL_GAP = 380;
+const ROW_GAP = 92;
+const ROOT_X = 0;
+const ROOT_Y = 0;
+
+let view = { x: 0, y: 0, scale: 1 };
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let viewStart = { x: 0, y: 0 };
+let suppressClick = false;
+let lastClickAt = 0;
+
+function applyView() {
+  viewport.setAttribute('transform', `translate(${view.x}, ${view.y}) scale(${view.scale})`);
+  renderMinimap();
+}
+
+function setViewToCenter(worldX, worldY, scale=view.scale) {
+  const rect = svg.getBoundingClientRect();
+  view.scale = scale;
+  view.x = rect.width / 2 - worldX * view.scale;
+  view.y = rect.height / 2 - worldY * view.scale;
+  applyView();
+}
+
+function zoomAt(clientX, clientY, factor) {
+  const rect = svg.getBoundingClientRect();
+  const px = clientX - rect.left;
+  const py = clientY - rect.top;
+  const beforeX = (px - view.x) / view.scale;
+  const beforeY = (py - view.y) / view.scale;
+  view.scale = Math.max(0.15, Math.min(3.5, view.scale * factor));
+  view.x = px - beforeX * view.scale;
+  view.y = py - beforeY * view.scale;
+  applyView();
+}
+
+function fitGraph() {
+  const rect = svg.getBoundingClientRect();
+  const bounds = graphBounds();
+  const padding = Math.min(90, Math.max(36, Math.min(rect.width, rect.height) * 0.1));
+  const graphWidth = Math.max(1, bounds.maxX - bounds.minX);
+  const graphHeight = Math.max(1, bounds.maxY - bounds.minY);
+  const availableWidth = Math.max(1, rect.width - padding * 2);
+  const availableHeight = Math.max(1, rect.height - padding * 2);
+  const scale = Math.max(0.2, Math.min(1, availableWidth / graphWidth, availableHeight / graphHeight));
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  setViewToCenter(centerX, centerY, scale);
+  updateStatus();
+}
+
+function resetView() {
+  const bounds = graphBounds();
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  setViewToCenter(centerX, centerY, 1);
+  updateStatus();
+}
+
+function resetGraph() {
+  const currentRoot = rootTable;
+  startNewRoot(currentRoot);
+  fitGraph();
+}
+
+function objectNameParts(name) {
+  const fullName = String(name);
+  const parts = fullName.split('.');
+
+  if (parts.length >= 3) {
+    return {
+      database: parts.slice(0, -2).join('.'),
+      schema: parts[parts.length - 2],
+      table: parts[parts.length - 1],
+      full: fullName
+    };
+  }
+
+  if (parts.length === 2) {
+    return {
+      database: '',
+      schema: parts[0],
+      table: parts[1],
+      full: fullName
+    };
+  }
+
+  return {
+    database: '',
+    schema: '',
+    table: fullName,
+    full: fullName
+  };
+}
+
+function shortName(name) {
+  return objectNameParts(name).table;
+}
+
+function objectMeta(name) {
+  const p = objectNameParts(name);
+  if (p.schema && p.database) return `${p.schema} · ${p.database}`;
+  return p.schema || p.database || '';
+}
+
+function escapeXml(s) {
+  return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+}
+
+function truncate(s, n=34) {
+  s = String(s);
+  return s.length > n ? s.slice(0, n-1) + '…' : s;
+}
+
+function edgeKey(s, t, relation='reference') { return `${relation}|||${s}|||${t}`; }
+
+function nodeStats(table) {
+  return DATA.table_stats[table] || {parent_count:0, child_count:0, in_weight:0, out_weight:0};
+}
+
+function updateStatus() {
+  const stats = nodeStats(selectedTable);
+  info.innerHTML = `
+    <span class="status-chip selected" title="${escapeXml(selectedTable)}"><strong>Selected</strong> ${escapeXml(selectedTable)}</span>
+    <button id="copyTableBtn" class="status-chip copy-chip" type="button" title="Copy full table name" aria-label="Copy full table name">⧉ Copy name</button>
+    <span class="status-chip"><strong>${visibleNodes.size}</strong> nodes</span>
+    <span class="status-chip"><strong>${visibleEdges.size}</strong> edges</span>
+    <span class="status-chip"><strong>${expandedNodes.size}</strong> expanded</span>
+    <span class="status-chip"><strong>${stats.parent_count}</strong> upstream</span>
+    <span class="status-chip"><strong>${stats.child_count}</strong> downstream</span>
+    <span class="status-chip"><strong>${(view.scale * 100).toFixed(0)}%</strong> zoom</span>
+  `;
+}
+
+let copyToastTimer = null;
+
+function showCopyToast(table, copied) {
+  if (!copyToast) return;
+  window.clearTimeout(copyToastTimer);
+  copyToast.textContent = copied ? `Copied: ${table}` : `Copy failed: ${table}`;
+  copyToast.classList.toggle('error', !copied);
+  copyToast.classList.add('show');
+  copyToastTimer = window.setTimeout(() => {
+    copyToast.classList.remove('show');
+  }, 1800);
+}
+
+function showCopyFeedback(table, copied) {
+  showCopyToast(table, copied);
+
+  const button = document.getElementById('copyTableBtn');
+  if (button) {
+    button.textContent = copied ? '✓ Copied' : 'Copy failed';
+    button.classList.toggle('copied', copied);
+  }
+
+  window.setTimeout(() => {
+    const currentButton = document.getElementById('copyTableBtn');
+    if (!currentButton) return;
+    currentButton.textContent = '⧉ Copy name';
+    currentButton.classList.remove('copied');
+  }, 1600);
+}
+
+async function copyTableName(table=selectedTable) {
+  if (!table) return false;
+
+  let copied = false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(table);
+      copied = true;
+    }
+  } catch (error) {
+    copied = false;
+  }
+
+  if (!copied) {
+    const textArea = document.createElement('textarea');
+    textArea.value = table;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.select();
+    copied = document.execCommand('copy');
+    textArea.remove();
+  }
+
+  showCopyFeedback(table, copied);
+
+  return copied;
+}
+
+function updateActionStates() {
+  const expandButton = document.getElementById('expandUpBtn');
+  const collapseButton = document.getElementById('collapseBtn');
+  if (expandButton) {
+    expandButton.disabled = !showParentsEl.checked || activeRelations().length === 0;
+  }
+  if (collapseButton) {
+    const branch = selectedTable && visibleNodes.has(selectedTable)
+      ? collectUpstreamBranch(selectedTable)
+      : new Set();
+    collapseButton.disabled = !Array.from(branch).some(table => expandedNodes.has(table));
+  }
+}
+
+function activeRelations() {
+  const relations = [];
+  if (showReferenceEl.checked) relations.push('reference');
+  if (showTriggerEl.checked) relations.push('trigger');
+  return relations;
+}
+
+function relationParents(table, relation) {
+  return (DATA.parents[relation] && DATA.parents[relation][table]) || [];
+}
+
+function relationChildren(table, relation) {
+  return (DATA.children[relation] && DATA.children[relation][table]) || [];
+}
+
+function combinedParents(table) {
+  return activeRelations().flatMap(r => relationParents(table, r));
+}
+
+function combinedChildren(table) {
+  return activeRelations().flatMap(r => relationChildren(table, r));
+}
+
+function tableType(table) {
+  const s = String(table).toLowerCase();
+  const parts = s.split(/[._-]/);
+  const joined = parts.join('_');
+
+  if (parts.includes('raw') || joined.includes('_raw_') || s.startsWith('raw.')) return 'raw';
+  if (parts.includes('stg') || parts.includes('stage') || parts.includes('staging') || s.startsWith('stg.')) return 'stg';
+  if (parts.includes('mart') || s.startsWith('mart.')) return 'mart';
+  if (parts.includes('rpt') || parts.includes('report') || parts.includes('dashboard') || s.startsWith('rpt.')) return 'rpt';
+  if (parts.includes('dw') || s.startsWith('dw.')) return 'dw';
+  if (parts.includes('ods') || s.startsWith('ods.')) return 'ods';
+  return 'other';
+}
+
+
+function scoreMatch(table, q) {
+  const t = String(table).toLowerCase();
+  const s = shortName(table).toLowerCase();
+
+  if (t === q) return 0;
+  if (s === q) return 1;
+  if (t.endsWith('.' + q)) return 2;
+  if (s.startsWith(q)) return 3;
+  if (t.includes('.' + q)) return 4;
+  if (t.includes(q)) return 5;
+  return 999;
+}
+
+function getMatches(query, limit=50) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return [];
+
+  return DATA.tables
+    .filter(t => String(t).toLowerCase().includes(q) || shortName(t).toLowerCase().includes(q))
+    .map(t => ({ table: t, score: scoreMatch(t, q) }))
+    .sort((a,b) => {
+      if (a.score !== b.score) return a.score - b.score;
+      const sa = nodeStats(a.table);
+      const sb = nodeStats(b.table);
+      const da = sa.parent_count + sa.child_count;
+      const db = sb.parent_count + sb.child_count;
+      if (db !== da) return db - da;
+      return a.table.localeCompare(b.table);
+    })
+    .slice(0, limit)
+    .map(x => x.table);
+}
+
+function highlightText(value, query) {
+  const q = (query || '').trim();
+  if (!q) return escapeXml(value);
+
+  const lower = String(value).toLowerCase();
+  const idx = lower.indexOf(q.toLowerCase());
+  if (idx < 0) return escapeXml(value);
+
+  return (
+    escapeXml(String(value).slice(0, idx)) +
+    '<span class="autocomplete-mark">' +
+    escapeXml(String(value).slice(idx, idx + q.length)) +
+    '</span>' +
+    escapeXml(String(value).slice(idx + q.length))
+  );
+}
+
+function renderAutocomplete(query) {
+  const q = (query || '').trim();
+  if (!q) {
+    autocomplete.style.display = 'none';
+    searchInput.setAttribute('aria-expanded', 'false');
+    autocomplete.innerHTML = '';
+    autocompleteMatches = [];
+    autocompleteIndex = -1;
+    return;
+  }
+
+  autocompleteMatches = getMatches(q, 80);
+  autocompleteIndex = autocompleteMatches.length ? Math.max(0, autocompleteIndex) : -1;
+
+  if (!autocompleteMatches.length) {
+    autocomplete.style.display = 'block';
+    searchInput.setAttribute('aria-expanded', 'true');
+    autocomplete.innerHTML = '<div class="autocomplete-item" role="option"><div class="autocomplete-main">No matches</div></div>';
+    return;
+  }
+
+  autocomplete.style.display = 'block';
+  searchInput.setAttribute('aria-expanded', 'true');
+  autocomplete.innerHTML = autocompleteMatches.map((t, i) => {
+    const stats = nodeStats(t);
+    const active = i === autocompleteIndex ? ' active' : '';
+    return `
+      <div class="autocomplete-item${active}" role="option" aria-selected="${i === autocompleteIndex}" data-index="${i}" data-table="${escapeXml(t)}">
+        <div class="autocomplete-main">${highlightText(t, q)}</div>
+        <div class="autocomplete-sub">short: ${highlightText(shortName(t), q)} · parents ${stats.parent_count} · children ${stats.child_count}</div>
+      </div>
+    `;
+  }).join('');
+
+  autocomplete.querySelectorAll('.autocomplete-item').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const table = el.getAttribute('data-table');
+      if (table) {
+        autocomplete.style.display = 'none';
+        searchInput.setAttribute('aria-expanded', 'false');
+        startNewRoot(table);
+      }
+    });
+
+    el.addEventListener('mousemove', () => {
+      const idx = Number(el.getAttribute('data-index'));
+      if (!Number.isNaN(idx)) {
+        autocompleteIndex = idx;
+        updateAutocompleteActive();
+      }
+    });
+  });
+}
+
+function updateAutocompleteActive() {
+  autocomplete.querySelectorAll('.autocomplete-item').forEach((el, i) => {
+    const active = i === autocompleteIndex;
+    el.classList.toggle('active', active);
+    el.setAttribute('aria-selected', String(active));
+  });
+}
+
+function findTable(query) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return null;
+
+  for (const t of DATA.tables) {
+    if (t.toLowerCase() === q) return t;
+  }
+
+  for (const t of DATA.tables) {
+    if (shortName(t).toLowerCase() === q) return t;
+  }
+
+  const matches = getMatches(query, 30);
+  if (matches.length === 1) return matches[0];
+
+  showSuggestions(matches);
+  return null;
+}
+
+function showSuggestions(matches) {
+  if (!matches.length) {
+    suggestions.innerHTML = 'No matches.';
+    return;
+  }
+  suggestions.innerHTML = 'Matches: ' + matches.map(t =>
+    `<a href="#" data-table="${escapeXml(t)}">${escapeXml(t)}</a>`
+  ).join(' | ');
+
+  suggestions.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      startNewRoot(a.getAttribute('data-table'));
+    });
+  });
+}
+
+function startNewRoot(table) {
+  if (!table || !DATA.tables.includes(table)) {
+    info.textContent = 'Table not found.';
+    return;
+  }
+
+  rootTable = table;
+  selectedTable = table;
+  visibleNodes = new Set([table]);
+  visibleEdges = new Map();
+  expandedNodes = new Set();
+  upstreamExpandedNodes = new Set();
+  downstreamExpandedNodes = new Set();
+  nodePos = new Map([[table, {x: ROOT_X, y: ROOT_Y, w: NODE_W, h: NODE_H}]]);
+  nodeKind = new Map([[table, 'root']]);
+
+  searchInput.value = table;
+  suggestions.innerHTML = '';
+  autocomplete.style.display = 'none';
+  searchInput.setAttribute('aria-expanded', 'false');
+  expandNode(table);
+  render();
+  setViewToCenter(ROOT_X, ROOT_Y, 1);
+}
+
+function addOrUpdateKind(table, kind) {
+  const prev = nodeKind.get(table);
+  if (!prev) nodeKind.set(table, kind);
+  else if (prev !== kind && prev !== 'root') nodeKind.set(table, 'mixed');
+}
+
+function hasCollision(x, y, ignoreTable=null) {
+  for (const [t, p] of nodePos.entries()) {
+    if (t === ignoreTable) continue;
+    if (Math.abs(p.x - x) < NODE_W * 0.95 && Math.abs(p.y - y) < NODE_H * 1.35) return true;
+  }
+  return false;
+}
+
+function findFreeY(x, desiredY) {
+  if (!hasCollision(x, desiredY)) return desiredY;
+  for (let step = 1; step < 500; step++) {
+    const up = desiredY - step * ROW_GAP;
+    const down = desiredY + step * ROW_GAP;
+    if (!hasCollision(x, up)) return up;
+    if (!hasCollision(x, down)) return down;
+  }
+  return desiredY;
+}
+
+function placeNeighbor(anchorTable, neighborTable, side, index, total) {
+  if (nodePos.has(neighborTable)) return;
+  const anchor = nodePos.get(anchorTable);
+  const x = side === 'parent' ? anchor.x - COL_GAP : anchor.x + COL_GAP;
+  const baseOffset = (index - (total - 1) / 2) * ROW_GAP;
+  const desiredY = anchor.y + baseOffset;
+  const y = findFreeY(x, desiredY);
+  nodePos.set(neighborTable, {x, y, w: NODE_W, h: NODE_H});
+}
+
+function addEdge(source, target, weight, kind, relationType) {
+  visibleNodes.add(source);
+  visibleNodes.add(target);
+  const key = edgeKey(source, target, relationType);
+  if (visibleEdges.has(key)) return;
+  visibleEdges.set(key, {
+    source, target, weight, kind, relation_type: relationType
+  });
+}
+
+function syncExpandedNodes() {
+  expandedNodes = new Set([...upstreamExpandedNodes, ...downstreamExpandedNodes]);
+}
+
+function expandNodeDirection(table, direction, trackState=true) {
+  if (!table || !DATA.tables.includes(table)) return;
+
+  for (const relation of activeRelations()) {
+    if (direction === 'upstream' && showParentsEl.checked) {
+      const parents = relationParents(table, relation).slice(0, MAX_NEIGHBORS);
+      parents.forEach((p, i) => {
+        placeNeighbor(table, p.table, 'parent', i, parents.length);
+        addOrUpdateKind(p.table, 'parent');
+        addEdge(p.table, table, p.weight, 'parent', relation);
+      });
+    }
+
+    if (direction === 'downstream' && showChildrenEl.checked) {
+      const children = relationChildren(table, relation).slice(0, MAX_NEIGHBORS);
+      children.forEach((c, i) => {
+        placeNeighbor(table, c.table, 'child', i, children.length);
+        addOrUpdateKind(c.table, 'child');
+        addEdge(table, c.table, c.weight, 'child', relation);
+      });
+    }
+  }
+
+  visibleNodes.add(table);
+  if (trackState) {
+    if (direction === 'upstream' && showParentsEl.checked) upstreamExpandedNodes.add(table);
+    if (direction === 'downstream' && showChildrenEl.checked) downstreamExpandedNodes.add(table);
+    syncExpandedNodes();
+  }
+}
+
+function expandNode(table) {
+  if (!table || !DATA.tables.includes(table)) return;
+  selectedTable = table;
+  if (showParentsEl.checked) expandNodeDirection(table, 'upstream');
+  if (showChildrenEl.checked) expandNodeDirection(table, 'downstream');
+}
+
+function expandUpstream(table, maxDepth=AUTO_DEPTH) {
+  if (!table || !DATA.tables.includes(table) || !showParentsEl.checked) return 0;
+
+  const originalSelection = table;
+  const visited = new Set([table]);
+  const queue = [{table, depth: 0}];
+
+  while (queue.length) {
+    const item = queue.shift();
+
+    for (const relation of activeRelations()) {
+      const parents = relationParents(item.table, relation).slice(0, MAX_NEIGHBORS);
+      parents.forEach((p, i) => {
+        placeNeighbor(item.table, p.table, 'parent', i, parents.length);
+        addOrUpdateKind(p.table, 'parent');
+        addEdge(p.table, item.table, p.weight, 'parent', relation);
+        visibleNodes.add(p.table);
+
+        if (item.depth + 1 < maxDepth && !visited.has(p.table)) {
+          visited.add(p.table);
+          queue.push({table: p.table, depth: item.depth + 1});
+        }
+      });
+    }
+
+    visibleNodes.add(item.table);
+    upstreamExpandedNodes.add(item.table);
+  }
+
+  syncExpandedNodes();
+  selectedTable = originalSelection;
+  return Math.max(0, visited.size - 1);
+}
+
+function rebuildFromExpandedKeepPositions() {
+  const oldKind = new Map(nodeKind);
+  const previousSelection = selectedTable;
+  const upstreamList = Array.from(upstreamExpandedNodes);
+  const downstreamList = Array.from(downstreamExpandedNodes);
+
+  visibleNodes = new Set([rootTable]);
+  visibleEdges = new Map();
+  nodeKind = new Map([[rootTable, 'root']]);
+
+  for (const t of new Set([...upstreamList, ...downstreamList])) {
+    if (oldKind.has(t)) nodeKind.set(t, oldKind.get(t));
+  }
+
+  if (activeRelations().length) {
+    if (showParentsEl.checked) {
+      for (const t of upstreamList) expandNodeDirection(t, 'upstream', false);
+    }
+    if (showChildrenEl.checked) {
+      for (const t of downstreamList) expandNodeDirection(t, 'downstream', false);
+    }
+  }
+
+  syncExpandedNodes();
+  pruneInvisibleOnly();
+  selectedTable = visibleNodes.has(previousSelection) ? previousSelection : rootTable;
+}
+
+function collapseNode(table) {
+  if (!expandedNodes.has(table)) return;
+  upstreamExpandedNodes.delete(table);
+  downstreamExpandedNodes.delete(table);
+  syncExpandedNodes();
+  rebuildFromExpandedKeepPositions();
+  selectedTable = visibleNodes.has(table) ? table : rootTable;
+}
+
+function collectUpstreamBranch(table) {
+  const toCollapse = new Set();
+  const queue = [table];
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (toCollapse.has(current)) continue;
+    toCollapse.add(current);
+
+    for (const relation of activeRelations()) {
+      for (const parent of relationParents(current, relation)) {
+        if (visibleNodes.has(parent.table) || upstreamExpandedNodes.has(parent.table)) {
+          queue.push(parent.table);
+        }
+      }
+    }
+  }
+
+  return toCollapse;
+}
+
+function collapseUpstreamBranch(table) {
+  if (!table || !visibleNodes.has(table)) return 0;
+
+  const toCollapse = collectUpstreamBranch(table);
+
+  for (const node of toCollapse) {
+    upstreamExpandedNodes.delete(node);
+    downstreamExpandedNodes.delete(node);
+  }
+  syncExpandedNodes();
+  rebuildFromExpandedKeepPositions();
+  selectedTable = visibleNodes.has(table) ? table : rootTable;
+  return toCollapse.size;
+}
+
+function pruneInvisibleOnly() {
+  const visible = new Set([rootTable]);
+  for (const e of visibleEdges.values()) {
+    visible.add(e.source);
+    visible.add(e.target);
+  }
+  visibleNodes = visible;
+
+  for (const [k, e] of Array.from(visibleEdges.entries())) {
+    if (!visibleNodes.has(e.source) || !visibleNodes.has(e.target)) {
+      visibleEdges.delete(k);
+    }
+  }
+}
+
+function toggleNode(table) {
+  selectedTable = table;
+  if (expandedNodes.has(table)) {
+    collapseNode(table);
+  } else {
+    if (!nodePos.has(table)) {
+      nodePos.set(table, {x: 0, y: 0, w: NODE_W, h: NODE_H});
+    }
+    expandNode(table);
+  }
+  render();
+}
+
+function setAsNewRoot(table) {
+  startNewRoot(table);
+}
+
+function linkPath(x1,y1,x2,y2) {
+  const mid = (x1 + x2) / 2;
+  return `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`;
+}
+
+function isSelectedEdge(e) {
+  return e.source === selectedTable || e.target === selectedTable;
+}
+
+function unexpandedCount(table) {
+  let cnt = 0;
+  for (const relation of activeRelations()) {
+    for (const p of relationParents(table, relation)) {
+      if (!visibleEdges.has(edgeKey(p.table, table, relation))) cnt++;
+    }
+    for (const c of relationChildren(table, relation)) {
+      if (!visibleEdges.has(edgeKey(table, c.table, relation))) cnt++;
+    }
+  }
+  return cnt;
+}
+
+
+function tooltipList(items, maxItems=20) {
+  if (!items || !items.length) return '-';
+
+  const shown = items.slice(0, maxItems).map(x => {
+    const w = x.weight !== undefined ? ` (${x.weight})` : '';
+    return `${x.table}${w}`;
+  });
+
+  const more = items.length > maxItems ? `\n... +${items.length - maxItems} more` : '';
+  return shown.join('\n') + more;
+}
+
+function nodeTooltip(table, remaining) {
+  const stats = nodeStats(table);
+  const nameParts = objectNameParts(table);
+  const refParents = relationParents(table, 'reference');
+  const refChildren = relationChildren(table, 'reference');
+  const triggerParents = relationParents(table, 'trigger');
+  const triggerChildren = relationChildren(table, 'trigger');
+
+  return (
+    `Table: ${nameParts.table}
+` +
+    `Schema: ${nameParts.schema || '-'}
+` +
+    `Database: ${nameParts.database || '-'}
+` +
+    `Full name: ${table}
+
+` +
+    `Reference U:${stats.reference_parent_count || 0} D:${stats.reference_child_count || 0}
+` +
+    `Trigger U:${stats.trigger_parent_count || 0} D:${stats.trigger_child_count || 0}
+` +
+    `Remaining: ${remaining}
+
+` +
+    `[Reference Upstream]
+${tooltipList(refParents, 25)}
+
+` +
+    `[Reference Downstream]
+${tooltipList(refChildren, 25)}
+
+` +
+    `[Trigger Upstream]
+${tooltipList(triggerParents, 25)}
+
+` +
+    `[Trigger Downstream]
+${tooltipList(triggerChildren, 25)}
+
+` +
+    `Click: expand/collapse
+` +
+    `Shift+click: copy full name
+` +
+    `Ctrl+click: new root
+` +
+    `Double-click: expand all upstream`
+  );
+}
+
+let nodeTooltipTimer = null;
+
+function hideNodeTooltip() {
+  window.clearTimeout(nodeTooltipTimer);
+  nodeTooltipEl.classList.remove('show');
+}
+
+function positionNodeTooltip(clientX, clientY) {
+  const wrapRect = wrap.getBoundingClientRect();
+  const tooltipRect = nodeTooltipEl.getBoundingClientRect();
+  const gap = 14;
+  const maxX = Math.max(8, wrapRect.width - tooltipRect.width - 8);
+  const maxY = Math.max(8, wrapRect.height - tooltipRect.height - 8);
+  const x = Math.max(8, Math.min(clientX - wrapRect.left + gap, maxX));
+  const y = Math.max(8, Math.min(clientY - wrapRect.top + gap, maxY));
+  nodeTooltipEl.style.left = `${x}px`;
+  nodeTooltipEl.style.top = `${y}px`;
+}
+
+function fitNodeTooltipText(text) {
+  nodeTooltipEl.textContent = text;
+  if (nodeTooltipEl.scrollHeight <= nodeTooltipEl.clientHeight
+      && nodeTooltipEl.scrollWidth <= nodeTooltipEl.clientWidth) return;
+
+  let low = 0;
+  let high = text.length;
+  let best = '…';
+
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const candidate = `${text.slice(0, middle).trimEnd()}…`;
+    nodeTooltipEl.textContent = candidate;
+
+    const fits = nodeTooltipEl.scrollHeight <= nodeTooltipEl.clientHeight
+      && nodeTooltipEl.scrollWidth <= nodeTooltipEl.clientWidth;
+    if (fits) {
+      best = candidate;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+
+  nodeTooltipEl.textContent = best;
+}
+
+function scheduleNodeTooltip(table, event) {
+  hideNodeTooltip();
+  if (event.shiftKey) return;
+  const clientX = event.clientX;
+  const clientY = event.clientY;
+  nodeTooltipTimer = window.setTimeout(() => {
+    const tooltipText = nodeTooltip(table, unexpandedCount(table));
+    nodeTooltipEl.textContent = tooltipText;
+    nodeTooltipEl.classList.add('show');
+    positionNodeTooltip(clientX, clientY);
+    fitNodeTooltipText(tooltipText);
+    positionNodeTooltip(clientX, clientY);
+  }, 450);
+}
+
+function nodeHTML(table, p) {
+  const kind = nodeKind.get(table) || 'mixed';
+  const stats = nodeStats(table);
+  const nameParts = objectNameParts(table);
+  const label = truncate(nameParts.table, 32);
+  const meta = truncate(table, 43);
+  const sub = `Ref ↑${stats.reference_parent_count || 0} ↓${stats.reference_child_count || 0} · Trg ↑${stats.trigger_parent_count || 0} ↓${stats.trigger_child_count || 0}`;
+  const expandedCls = expandedNodes.has(table) ? ' expanded' : '';
+  const selectedCls = table === selectedTable ? ' selected' : '';
+  const ttype = tableType(table);
+  const remaining = unexpandedCount(table);
+  const badge = remaining > 0
+    ? `<circle cx="${p.w/2 - 12}" cy="${-p.h/2 + 12}" r="13" fill="#f97316"></circle><text class="badge-text" x="${p.w/2 - 12}" y="${-p.h/2 + 12}" text-anchor="middle">${remaining > 99 ? '99+' : remaining}</text>`
+    : '';
+
+  return `
+    <g class="node ${kind}${expandedCls}${selectedCls} type-${ttype}" transform="translate(${p.x},${p.y})" data-table="${escapeXml(table)}" role="button" tabindex="0" aria-label="${escapeXml(table)} table. Press Enter to expand or collapse. Shift click to copy the full name.">
+      <rect x="${-p.w/2}" y="${-p.h/2}" width="${p.w}" height="${p.h}"></rect>
+      ${badge}
+      <text class="table-name" x="0" y="-19" text-anchor="middle">${escapeXml(label)}</text>
+      <text class="object-meta" x="0" y="0" text-anchor="middle">${escapeXml(meta)}</text>
+      <text class="subtext" x="0" y="19" text-anchor="middle">${escapeXml(sub)}</text>
+      ${expandedNodes.has(table) ? '<text class="expanded-label" x="0" y="33" text-anchor="middle">expanded</text>' : ''}
+    </g>
+  `;
+}
+
+function render() {
+  hideNodeTooltip();
+  let linksHTML = '';
+  for (const e of visibleEdges.values()) {
+    const s = nodePos.get(e.source);
+    const t = nodePos.get(e.target);
+    if (!s || !t) continue;
+
+    const directionCls = e.kind === 'parent' ? 'parent-link' : 'child-link';
+    const relationCls = e.relation_type === 'trigger' ? 'trigger-link' : 'reference-link';
+    const selectedCls = isSelectedEdge(e) ? ' selected-link' : '';
+    linksHTML += `<path class="link ${directionCls} ${relationCls}${selectedCls}" d="${linkPath(s.x+s.w/2, s.y, t.x-t.w/2, t.y)}"><title>${escapeXml(e.source)} → ${escapeXml(e.target)}&#10;relation: ${escapeXml(e.relation_type)}&#10;weight: ${e.weight}</title></path>`;
+  }
+
+  const nodesHTML = Array.from(visibleNodes).map(t => {
+    const p = nodePos.get(t);
+    if (!p) return '';
+    return nodeHTML(t, p);
+  }).join('');
+
+  viewport.innerHTML = `
+    <defs>
+      <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L9,3 z" fill="#9ca3af" />
+      </marker>
+    </defs>
+    ${linksHTML}
+    ${nodesHTML}
+  `;
+
+  viewport.querySelectorAll('.node').forEach(el => {
+    el.addEventListener('mouseenter', event => {
+      const t = el.getAttribute('data-table');
+      if (t) scheduleNodeTooltip(t, event);
+    });
+
+    el.addEventListener('mousemove', event => {
+      if (nodeTooltipEl.classList.contains('show')) {
+        positionNodeTooltip(event.clientX, event.clientY);
+      }
+    });
+
+    el.addEventListener('mouseleave', hideNodeTooltip);
+    el.addEventListener('mousedown', hideNodeTooltip);
+
+    el.addEventListener('click', event => {
+      event.stopPropagation();
+      if (suppressClick) return;
+      const t = el.getAttribute('data-table');
+      if (!t) return;
+
+      if (event.shiftKey) {
+        selectedTable = t;
+        render();
+        copyTableName(t);
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastClickAt < 250) return;
+      lastClickAt = now;
+
+      if (event.ctrlKey || event.metaKey) {
+        setAsNewRoot(t);
+      } else {
+        toggleNode(t);
+      }
+    });
+
+    el.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      if (event.shiftKey) return;
+      const t = el.getAttribute('data-table');
+      if (!t) return;
+      selectedTable = t;
+      expandUpstream(t);
+      render();
+    });
+
+    el.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      const t = el.getAttribute('data-table');
+      if (!t) return;
+      if (event.ctrlKey || event.metaKey) setAsNewRoot(t);
+      else {
+        toggleNode(t);
+        requestAnimationFrame(() => {
+          const updatedNode = Array.from(viewport.querySelectorAll('.node'))
+            .find(node => node.getAttribute('data-table') === t);
+          if (updatedNode) updatedNode.focus();
+        });
+      }
+    });
+  });
+
+  updateStatus();
+  updateActionStates();
+
+  applyView();
+  renderMinimap();
+}
+
+function graphBounds() {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const t of visibleNodes) {
+    const p = nodePos.get(t);
+    if (!p) continue;
+    minX = Math.min(minX, p.x - p.w/2);
+    maxX = Math.max(maxX, p.x + p.w/2);
+    minY = Math.min(minY, p.y - p.h/2);
+    maxY = Math.max(maxY, p.y + p.h/2);
+  }
+  if (!isFinite(minX)) return {minX:-100, maxX:100, minY:-100, maxY:100};
+  return {minX, maxX, minY, maxY};
+}
+
+function renderMinimap() {
+  const mmW = 220, mmH = 150;
+  minimapSvg.setAttribute('viewBox', `0 0 ${mmW} ${mmH}`);
+
+  const b = graphBounds();
+  const gw = Math.max(1, b.maxX - b.minX);
+  const gh = Math.max(1, b.maxY - b.minY);
+  const pad = 16;
+  const scale = Math.min((mmW - pad*2) / gw, (mmH - pad*2) / gh);
+
+  function mx(x) { return pad + (x - b.minX) * scale; }
+  function my(y) { return pad + (y - b.minY) * scale; }
+
+  let html = '';
+  for (const t of visibleNodes) {
+    const p = nodePos.get(t);
+    if (!p) continue;
+    const cls = t === selectedTable ? 'minimap-selected' : 'minimap-node';
+    html += `<circle class="${cls}" cx="${mx(p.x)}" cy="${my(p.y)}" r="2.8"></circle>`;
+  }
+
+  // viewport rectangle in world coordinates
+  const rect = svg.getBoundingClientRect();
+  const vx1 = (0 - view.x) / view.scale;
+  const vy1 = (0 - view.y) / view.scale;
+  const vx2 = (rect.width - view.x) / view.scale;
+  const vy2 = (rect.height - view.y) / view.scale;
+
+  html += `<rect class="minimap-view" x="${mx(vx1)}" y="${my(vy1)}" width="${Math.max(4, (vx2-vx1)*scale)}" height="${Math.max(4, (vy2-vy1)*scale)}"></rect>`;
+  minimapSvg.innerHTML = html;
+}
+
+
+
+function safeFilenamePart(value) {
+  return String(value || 'lineage')
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, '_')
+    .slice(0, 120);
+}
+
+function autosizeColumns(rows, headers) {
+  return headers.map(h => {
+    let maxLen = String(h).length;
+    for (const row of rows) {
+      const v = row[h] === null || row[h] === undefined ? '' : String(row[h]);
+      maxLen = Math.max(maxLen, Math.min(v.length, 80));
+    }
+    return { wch: Math.max(10, maxLen + 2) };
+  });
+}
+
+function addSheet(wb, name, rows, headers) {
+  const safeRows = rows || [];
+  const ws = XLSX.utils.json_to_sheet(safeRows, { header: headers });
+  ws['!cols'] = autosizeColumns(safeRows, headers);
+  ws['!autofilter'] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: 0, c: 0 },
+      e: { r: Math.max(0, safeRows.length), c: Math.max(0, headers.length - 1) }
+    })
+  };
+  XLSX.utils.book_append_sheet(wb, ws, name);
+}
+
+function visibleNodeRows() {
+  return Array.from(visibleNodes).map(table => {
+    const stats = nodeStats(table);
+    const p = nodePos.get(table) || {};
+    const nameParts = objectNameParts(table);
+    return {
+      full_name: table,
+      database: nameParts.database,
+      schema: nameParts.schema,
+      table_name: nameParts.table,
+      type: tableType(table),
+      node_kind: nodeKind.get(table) || '',
+      is_root: table === rootTable ? 'Y' : 'N',
+      is_selected: table === selectedTable ? 'Y' : 'N',
+      is_expanded: expandedNodes.has(table) ? 'Y' : 'N',
+      parent_count: stats.parent_count,
+      child_count: stats.child_count,
+      reference_parent_count: stats.reference_parent_count || 0,
+      reference_child_count: stats.reference_child_count || 0,
+      trigger_parent_count: stats.trigger_parent_count || 0,
+      trigger_child_count: stats.trigger_child_count || 0,
+      unexpanded_count: unexpandedCount(table),
+      x: p.x ?? '',
+      y: p.y ?? ''
+    };
+  });
+}
+
+function visibleEdgeRows() {
+  return Array.from(visibleEdges.values()).map(e => ({
+    source_table: e.source,
+    target_table: e.target,
+    direction_type: e.kind,
+    relation_type: e.relation_type,
+    edge_count: e.weight,
+    is_selected_edge: isSelectedEdge(e) ? 'Y' : 'N',
+    source_type: tableType(e.source),
+    target_type: tableType(e.target)
+  }));
+}
+
+function allEdgeRows() {
+  const rows = [];
+  for (const relation of DATA.relation_types || ['reference', 'trigger']) {
+    for (const source of DATA.tables) {
+      const children = relationChildren(source, relation);
+      for (const c of children) {
+        rows.push({
+          source_table: source,
+          target_table: c.table,
+          relation_type: relation,
+          edge_count: c.weight,
+          source_type: tableType(source),
+          target_type: tableType(c.table),
+          source_parent_count: nodeStats(source).parent_count,
+          source_child_count: nodeStats(source).child_count,
+          target_parent_count: nodeStats(c.table).parent_count,
+          target_child_count: nodeStats(c.table).child_count
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+function expandedPathRows() {
+  const rows = [];
+  for (const table of expandedNodes) {
+    for (const relation of DATA.relation_types || ['reference', 'trigger']) {
+      for (const p of relationParents(table, relation)) {
+        if (visibleEdges.has(edgeKey(p.table, table, relation))) {
+          rows.push({root_table: rootTable, expanded_table: table, direction: 'upstream', relation_type: relation, source_table: p.table, target_table: table, edge_count: p.weight, source_type: tableType(p.table), target_type: tableType(table), source_visible: visibleNodes.has(p.table) ? 'Y' : 'N', target_visible: visibleNodes.has(table) ? 'Y' : 'N'});
+        }
+      }
+      for (const c of relationChildren(table, relation)) {
+        if (visibleEdges.has(edgeKey(table, c.table, relation))) {
+          rows.push({root_table: rootTable, expanded_table: table, direction: 'downstream', relation_type: relation, source_table: table, target_table: c.table, edge_count: c.weight, source_type: tableType(table), target_type: tableType(c.table), source_visible: visibleNodes.has(table) ? 'Y' : 'N', target_visible: visibleNodes.has(c.table) ? 'Y' : 'N'});
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+function parentChildListRows() {
+  const rows = [];
+  for (const table of visibleNodes) {
+    for (const relation of DATA.relation_types || ['reference', 'trigger']) {
+      for (const p of relationParents(table, relation)) {
+        rows.push({table, relation: 'parent', relation_type: relation, related_table: p.table, edge_count: p.weight, related_visible: visibleNodes.has(p.table) ? 'Y' : 'N', related_expanded: expandedNodes.has(p.table) ? 'Y' : 'N'});
+      }
+      for (const c of relationChildren(table, relation)) {
+        rows.push({table, relation: 'child', relation_type: relation, related_table: c.table, edge_count: c.weight, related_visible: visibleNodes.has(c.table) ? 'Y' : 'N', related_expanded: expandedNodes.has(c.table) ? 'Y' : 'N'});
+      }
+    }
+  }
+  return rows;
+}
+
+function writeWorkbook(filename, sheets) {
+  if (typeof XLSX === 'undefined') {
+    alert('SheetJS(XLSX) library is not loaded. Check network access to cdn.sheetjs.com.');
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  for (const sheet of sheets) {
+    addSheet(wb, sheet.name, sheet.rows, sheet.headers);
+  }
+
+  XLSX.writeFile(wb, filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`);
+}
+
+function exportVisibleExcel() {
+  const summaryRows = [{
+    data_updated_at: DATA_UPDATED_AT,
+    root_table: rootTable,
+    selected_table: selectedTable,
+    visible_nodes: visibleNodes.size,
+    visible_edges: visibleEdges.size,
+    expanded_nodes: expandedNodes.size,
+    zoom_percent: Number((view.scale * 100).toFixed(0)),
+    show_parents: showParentsEl.checked ? 'Y' : 'N',
+    show_children: showChildrenEl.checked ? 'Y' : 'N',
+    show_reference: showReferenceEl.checked ? 'Y' : 'N',
+    show_trigger: showTriggerEl.checked ? 'Y' : 'N',
+    max_neighbors_per_click: MAX_NEIGHBORS
+  }];
+
+  writeWorkbook(
+    `lineage_visible_${safeFilenamePart(selectedTable)}.xlsx`,
+    [
+      {
+        name: 'Summary',
+        headers: ['data_updated_at', 'root_table', 'selected_table', 'visible_nodes', 'visible_edges', 'expanded_nodes', 'zoom_percent', 'show_parents', 'show_children', 'show_reference', 'show_trigger', 'max_neighbors_per_click'],
+        rows: summaryRows
+      },
+      {
+        name: 'Visible_Nodes',
+        headers: ['full_name', 'database', 'schema', 'table_name', 'type', 'node_kind', 'is_root', 'is_selected', 'is_expanded', 'parent_count', 'child_count', 'reference_parent_count', 'reference_child_count', 'trigger_parent_count', 'trigger_child_count', 'unexpanded_count', 'x', 'y'],
+        rows: visibleNodeRows()
+      },
+      {
+        name: 'Visible_Edges',
+        headers: ['source_table', 'target_table', 'direction_type', 'relation_type', 'edge_count', 'is_selected_edge', 'source_type', 'target_type'],
+        rows: visibleEdgeRows()
+      },
+      {
+        name: 'Expanded_Path',
+        headers: ['root_table', 'expanded_table', 'direction', 'relation_type', 'source_table', 'target_table', 'edge_count', 'source_type', 'target_type', 'source_visible', 'target_visible'],
+        rows: expandedPathRows()
+      },
+      {
+        name: 'Parent_Child_List',
+        headers: ['table', 'relation', 'relation_type', 'related_table', 'edge_count', 'related_visible', 'related_expanded'],
+        rows: parentChildListRows()
+      }
+    ]
+  );
+}
+
+function exportAllExcel() {
+  writeWorkbook(
+    'lineage_all_edges.xlsx',
+    [
+      {
+        name: 'All_Edges',
+        headers: ['source_table', 'target_table', 'relation_type', 'edge_count', 'source_type', 'target_type', 'source_parent_count', 'source_child_count', 'target_parent_count', 'target_child_count'],
+        rows: allEdgeRows()
+      }
+    ]
+  );
+}
+
+
+function syncToggleVisuals() {
+  const pairs = [
+    ['showReference', 'referenceToggle'],
+    ['showTrigger', 'triggerToggle'],
+    ['showParents', 'parentsToggle'],
+    ['showChildren', 'childrenToggle']
+  ];
+  pairs.forEach(([inputId, labelId]) => {
+    const input = document.getElementById(inputId);
+    const label = document.getElementById(labelId);
+    if (input && label) label.classList.toggle('active', input.checked);
+  });
+}
+
+
+
+
+
+function searchAndRoot() {
+  const t = findTable(searchInput.value);
+  if (t) startNewRoot(t);
+}
+
+svg.addEventListener('mousedown', e => {
+  isPanning = true;
+  suppressClick = false;
+  wrap.classList.add('panning');
+  panStart = { x: e.clientX, y: e.clientY };
+  viewStart = { x: view.x, y: view.y };
+});
+
+window.addEventListener('mousemove', e => {
+  if (!isPanning) return;
+  const dx = e.clientX - panStart.x;
+  const dy = e.clientY - panStart.y;
+  if (Math.abs(dx) + Math.abs(dy) > 4) suppressClick = true;
+  view.x = viewStart.x + dx;
+  view.y = viewStart.y + dy;
+  applyView();
+});
+
+window.addEventListener('mouseup', () => {
+  if (!isPanning) return;
+  isPanning = false;
+  wrap.classList.remove('panning');
+  setTimeout(() => { suppressClick = false; }, 0);
+});
+
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  zoomAt(e.clientX, e.clientY, factor);
+  updateStatus();
+}, { passive: false });
+
+document.getElementById('searchBtn').addEventListener('click', searchAndRoot);
+
+searchInput.addEventListener('input', e => {
+  autocompleteIndex = -1;
+  renderAutocomplete(searchInput.value);
+});
+
+searchInput.addEventListener('focus', e => {
+  renderAutocomplete(searchInput.value);
+});
+
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!autocompleteMatches.length) renderAutocomplete(searchInput.value);
+    if (autocompleteMatches.length) {
+      autocompleteIndex = Math.min(autocompleteMatches.length - 1, autocompleteIndex + 1);
+      updateAutocompleteActive();
+    }
+    return;
+  }
+
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (autocompleteMatches.length) {
+      autocompleteIndex = Math.max(0, autocompleteIndex - 1);
+      updateAutocompleteActive();
+    }
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (autocompleteMatches.length && autocompleteIndex >= 0) {
+      const table = autocompleteMatches[autocompleteIndex];
+      autocomplete.style.display = 'none';
+      searchInput.setAttribute('aria-expanded', 'false');
+      startNewRoot(table);
+    } else {
+      searchAndRoot();
+    }
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    autocomplete.style.display = 'none';
+    searchInput.setAttribute('aria-expanded', 'false');
+    return;
+  }
+});
+
+document.addEventListener('mousedown', e => {
+  if (!autocomplete.contains(e.target) && e.target !== searchInput) {
+    autocomplete.style.display = 'none';
+    searchInput.setAttribute('aria-expanded', 'false');
+  }
+});
+
+
+document.getElementById('collapseBtn').addEventListener('click', () => {
+  if (selectedTable) {
+    collapseUpstreamBranch(selectedTable);
+    render();
+    fitGraph();
+  }
+});
+
+document.getElementById('expandUpBtn').addEventListener('click', () => {
+  if (selectedTable && showParentsEl.checked) {
+    expandUpstream(selectedTable);
+    render();
+    fitGraph();
+  }
+});
+
+document.getElementById('exportVisibleBtn').addEventListener('click', exportVisibleExcel);
+document.getElementById('exportAllBtn').addEventListener('click', exportAllExcel);
+document.getElementById('fitBtn').addEventListener('click', fitGraph);
+document.getElementById('resetViewBtn').addEventListener('click', resetView);
+document.getElementById('resetGraphBtn').addEventListener('click', resetGraph);
+
+document.getElementById('zoomInBtn').addEventListener('click', () => {
+  const rect = svg.getBoundingClientRect();
+  zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.18);
+});
+
+document.getElementById('zoomOutBtn').addEventListener('click', () => {
+  const rect = svg.getBoundingClientRect();
+  zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1 / 1.18);
+});
+
+info.addEventListener('click', event => {
+  const copyButton = event.target.closest('#copyTableBtn');
+  if (copyButton) copyTableName();
+});
+
+document.addEventListener('copy', event => {
+  const target = event.target;
+  const isEditable = target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || target instanceof HTMLSelectElement
+    || target?.isContentEditable;
+
+  if (!isEditable && selectedTable && event.clipboardData) {
+    event.preventDefault();
+    event.clipboardData.setData('text/plain', selectedTable);
+    showCopyFeedback(selectedTable, true);
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Shift') hideNodeTooltip();
+});
+
+window.addEventListener('blur', hideNodeTooltip);
+
+showParentsEl.addEventListener('change', () => {
+  rebuildFromExpandedKeepPositions();
+  render();
+});
+
+showChildrenEl.addEventListener('change', () => {
+  rebuildFromExpandedKeepPositions();
+  render();
+});
+
+showReferenceEl.addEventListener('change', () => {
+  rebuildFromExpandedKeepPositions();
+  render();
+});
+
+showTriggerEl.addEventListener('change', () => {
+  rebuildFromExpandedKeepPositions();
+  render();
+});
+
+['showReference', 'showTrigger', 'showParents', 'showChildren'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', syncToggleVisuals);
+});
+syncToggleVisuals();
+
+
+const exportMenuBtn = document.getElementById('exportMenuBtn');
+const exportMenu = document.getElementById('exportMenu');
+
+if (exportMenuBtn && exportMenu) {
+  exportMenuBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const isOpen = exportMenu.classList.toggle('open');
+    exportMenuBtn.setAttribute('aria-expanded', String(isOpen));
+  });
+
+  document.addEventListener('click', () => {
+    exportMenu.classList.remove('open');
+    exportMenuBtn.setAttribute('aria-expanded', 'false');
+  });
+
+  exportMenu.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+
+  ['exportVisibleBtn', 'exportAllBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', () => {
+        exportMenu.classList.remove('open');
+        exportMenuBtn.setAttribute('aria-expanded', 'false');
+      });
+    }
+  });
+}
+startNewRoot(rootTable);
+</script>
+</body>
+</html>
