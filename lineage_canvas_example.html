@@ -1089,7 +1089,6 @@ let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let viewStart = { x: 0, y: 0 };
 let suppressClick = false;
-let lastClickAt = 0;
 
 function applyView() {
   viewport.setAttribute('transform', `translate(${view.x}, ${view.y}) scale(${view.scale})`);
@@ -1931,6 +1930,8 @@ function render() {
   `;
 
   viewport.querySelectorAll('.node').forEach(el => {
+    let pendingClick = null;
+
     el.addEventListener('mouseenter', event => {
       const t = el.getAttribute('data-table');
       if (t) scheduleNodeTooltip(t, event);
@@ -1958,20 +1959,28 @@ function render() {
         return;
       }
 
-      const now = Date.now();
-      if (now - lastClickAt < 250) return;
-      lastClickAt = now;
-
       if (event.ctrlKey || event.metaKey) {
         setAsNewRoot(t);
-      } else {
-        toggleNode(t);
+        return;
       }
+
+      if (event.detail > 1) {
+        clearTimeout(pendingClick);
+        pendingClick = null;
+        return;
+      }
+
+      pendingClick = window.setTimeout(() => {
+        pendingClick = null;
+        toggleNode(t);
+      }, 250);
     });
 
     el.addEventListener('dblclick', event => {
       event.stopPropagation();
       if (event.shiftKey) return;
+      clearTimeout(pendingClick);
+      pendingClick = null;
       const t = el.getAttribute('data-table');
       if (!t) return;
       selectedTable = t;
