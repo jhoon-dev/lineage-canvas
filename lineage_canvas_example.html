@@ -1198,14 +1198,20 @@ function nodeStats(table) {
 
 function updateStatus() {
   const stats = nodeStats(selectedTable);
+  const upstreamCount =
+    (showReferenceEl.checked ? stats.reference_parent_count || 0 : 0) +
+    (showTriggerEl.checked ? stats.trigger_parent_count || 0 : 0);
+  const downstreamCount =
+    (showReferenceEl.checked ? stats.reference_child_count || 0 : 0) +
+    (showTriggerEl.checked ? stats.trigger_child_count || 0 : 0);
   info.innerHTML = `
     <span class="status-chip selected" title="${escapeXml(selectedTable)}"><strong>Selected</strong> ${escapeXml(selectedTable)}</span>
     <button id="copyTableBtn" class="status-chip copy-chip" type="button" title="Copy full table name" aria-label="Copy full table name">⧉ Copy name</button>
     <span class="status-chip"><strong>${visibleNodes.size}</strong> nodes</span>
     <span class="status-chip"><strong>${visibleEdges.size}</strong> edges</span>
     <span class="status-chip"><strong>${expandedNodes.size}</strong> expanded</span>
-    <span class="status-chip"><strong>${stats.parent_count}</strong> upstream</span>
-    <span class="status-chip"><strong>${stats.child_count}</strong> downstream</span>
+    <span class="status-chip"><strong>${upstreamCount}</strong> upstream</span>
+    <span class="status-chip"><strong>${downstreamCount}</strong> downstream</span>
     <span class="status-chip"><strong>${(view.scale * 100).toFixed(0)}%</strong> zoom</span>
   `;
 }
