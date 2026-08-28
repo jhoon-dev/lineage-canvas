@@ -999,9 +999,9 @@
 
     <div class="view-actions">
       <button id="expandUpBtn" class="btn" title="Expand all upstream tables">Expand upstream</button>
-      <button id="collapseBtn" class="btn" title="Collapse the selected table">Collapse</button>
+      <button id="collapseBtn" class="btn" title="Collapse all expanded tables">Collapse all</button>
       <button id="fitBtn" class="btn" title="Fit all visible tables in the graph">Fit graph</button>
-      <button id="resetViewBtn" class="btn" title="Reset zoom to 100% and center the visible graph">Reset view</button>
+      <button id="resetViewBtn" class="btn" title="Reset zoom to 100% and center the root table">Reset view</button>
       <button id="resetGraphBtn" class="btn danger-ghost" title="Reset the graph to the current root table">Reset graph</button>
       <button id="zoomInBtn" class="btn icon-btn" title="Zoom in" aria-label="Zoom in">＋</button>
       <button id="zoomOutBtn" class="btn icon-btn" title="Zoom out" aria-label="Zoom out">－</button>
@@ -1131,10 +1131,8 @@ function fitGraph() {
 }
 
 function resetView() {
-  const bounds = graphBounds();
-  const centerX = (bounds.minX + bounds.maxX) / 2;
-  const centerY = (bounds.minY + bounds.maxY) / 2;
-  setViewToCenter(centerX, centerY, 1);
+  const rootPos = nodePos.get(rootTable);
+  setViewToCenter(rootPos ? rootPos.x : ROOT_X, rootPos ? rootPos.y : ROOT_Y, 1);
   updateStatus();
 }
 
@@ -1280,10 +1278,7 @@ function updateActionStates() {
     expandButton.disabled = !showParentsEl.checked || activeRelations().length === 0;
   }
   if (collapseButton) {
-    const branch = selectedTable && visibleNodes.has(selectedTable)
-      ? collectUpstreamBranch(selectedTable)
-      : new Set();
-    collapseButton.disabled = !Array.from(branch).some(table => expandedNodes.has(table));
+    collapseButton.disabled = expandedNodes.size === 0;
   }
 }
 
@@ -1657,40 +1652,14 @@ function collapseNode(table) {
   selectedTable = visibleNodes.has(table) ? table : rootTable;
 }
 
-function collectUpstreamBranch(table) {
-  const toCollapse = new Set();
-  const queue = [table];
-
-  while (queue.length) {
-    const current = queue.shift();
-    if (toCollapse.has(current)) continue;
-    toCollapse.add(current);
-
-    for (const relation of activeRelations()) {
-      for (const parent of relationParents(current, relation)) {
-        if (visibleNodes.has(parent.table) || upstreamExpandedNodes.has(parent.table)) {
-          queue.push(parent.table);
-        }
-      }
-    }
-  }
-
-  return toCollapse;
-}
-
-function collapseUpstreamBranch(table) {
-  if (!table || !visibleNodes.has(table)) return 0;
-
-  const toCollapse = collectUpstreamBranch(table);
-
-  for (const node of toCollapse) {
-    upstreamExpandedNodes.delete(node);
-    downstreamExpandedNodes.delete(node);
-  }
+function collapseAll() {
+  const collapsedCount = expandedNodes.size;
+  upstreamExpandedNodes.clear();
+  downstreamExpandedNodes.clear();
   syncExpandedNodes();
   rebuildFromExpandedKeepPositions();
-  selectedTable = visibleNodes.has(table) ? table : rootTable;
-  return toCollapse.size;
+  selectedTable = rootTable;
+  return collapsedCount;
 }
 
 function pruneInvisibleOnly() {
@@ -2382,10 +2351,10 @@ document.addEventListener('mousedown', e => {
 
 
 document.getElementById('collapseBtn').addEventListener('click', () => {
-  if (selectedTable) {
-    collapseUpstreamBranch(selectedTable);
+  if (expandedNodes.size) {
+    collapseAll();
     render();
-    fitGraph();
+    resetView();
   }
 });
 
