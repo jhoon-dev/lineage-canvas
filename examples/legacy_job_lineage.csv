@@ -1,0 +1,6 @@
+source_table,target_table,job_name
+raw.orders,stg.orders,주문 수집
+raw.customers,stg.customers,주문 수집
+stg.orders,mart.sales_daily,매출 집계
+stg.customers,mart.sales_daily,매출 집계
+mart.sales_daily,rpt.sales_dashboard,대시보드 생성

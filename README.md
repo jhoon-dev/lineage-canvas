@@ -1,6 +1,6 @@
 # LineageCanvas
 
-Generate a portable, interactive table-lineage explorer from a relational database as a single HTML file.
+Generate portable, interactive table and job lineage explorers as single HTML files.
 
 LineageCanvas reads table relationships through SQLAlchemy, builds upstream and downstream lineage, and embeds the result in a standalone HTML page. The generated page can be opened locally or published on any static host without running an application server.
 
@@ -22,6 +22,108 @@ Database -> Python generator -> standalone HTML -> static web server
 ```
 
 The browser never connects to the database. Database access happens only while the Python generator is running.
+
+## Job Lineage (CSV)
+
+Job Lineage uses the same Python → standalone HTML workflow, with a dedicated job graph.
+No database settings or browser libraries are needed for this mode.
+
+```bash
+python lineage_canvas.py --mode job
+```
+
+By default this reads `job_table_mapping.csv` from the current directory and writes
+`job_lineage_canvas.html`. The included sample contains a **5 Tables** connection,
+duplicate mappings, a two-job cycle, and an in-place update.
+
+```bash
+python lineage_canvas.py --mode job --input job_table_mapping.csv --output job_lineage_canvas.html --initial-job J002
+python lineage_canvas.py --mode job --input examples/legacy_job_lineage.csv --output legacy_jobs.html
+```
+
+Open the generated HTML directly in a modern browser. Each node previews up to
+three READ and three WRITE tables; click the node for its complete lists and
+upstream/downstream jobs. Click a connection's **5 Tables** label (or the line)
+to view all shared tables. Nodes and labels also support Enter/Space, and the
+table dialog closes with Escape. Search accepts job IDs, names, and table names.
+Select a job to explore all upstream/downstream dependencies, or return to the
+whole graph. Drag the canvas, use the wheel/zoom buttons, or fit it to the screen.
+CSV export includes the currently visible jobs in the canonical mapping format.
+
+### Default input: job_table_mapping.csv
+
+```csv
+job_id,job_name,table_name,relation_type
+J001,Load orders,raw.orders,READ
+J001,Load orders,stg.orders,WRITE
+J002,Aggregate sales,stg.orders,READ
+J002,Aggregate sales,mart.sales_daily,WRITE
+```
+
+- One row describes one Job/table READ or WRITE relationship.
+- All four values are required. IDs distinguish jobs even when names match.
+- READ/WRITE is case-insensitive; surrounding whitespace is removed. Job IDs
+  and table names are case-sensitive. Use consistent fully qualified table names.
+- Repeated `(job_id, table_name, relation_type)` rows count only once. A job ID
+  with inconsistent names raises an error instead of silently merging jobs.
+- Use UTF-8 (an Excel BOM is accepted). CSV quoting supports commas and newlines;
+  IDs such as `001` and literal names such as `NA` are preserved.
+
+### Legacy input
+
+```csv
+source_table,target_table,job_name
+raw.orders,stg.orders,Load orders
+stg.orders,mart.sales_daily,Aggregate sales
+```
+
+`source_table` becomes READ and `target_table` becomes WRITE. An optional `job_id`
+is respected; otherwise `job_name` is the job identity. Repeated names therefore
+merge into the same job in this format. Blank source or target supports jobs
+that only read or only write; both cannot be blank. If both complete schemas
+are present, the canonical four-column mapping takes precedence. The formats
+are detected from headers, not filenames.
+
+### Dependency and cycle rules
+
+A → B exists when A writes at least one table that B reads. One directed edge
+stores the sorted, unique intersection of those tables; its label counts tables,
+not CSV rows. Multiple writers connect to every other job that reads the table.
+The diagnostics dialog lists these ambiguous producers; table mappings alone do
+not establish which execution produced the data.
+
+READ and WRITE on the same job/table remain visible as an in-place operation;
+they do not create a self-edge or imply a cycle across separate jobs. Cycles
+between jobs are preserved, highlighted with amber dashed connections, and
+listed by strongly connected group. Layout places each group at the same level,
+then orders the condensed acyclic graph. Graph construction and traversal use
+iterative algorithms so cycles and long chains terminate without recursion limits.
+Disconnected jobs are retained. A header-only mapping produces an empty canvas.
+
+### Python API and code structure
+
+```python
+from job_lineage import load_job_mapping_csv, export_job_lineage_canvas_html
+
+data = export_job_lineage_canvas_html(
+    load_job_mapping_csv("job_table_mapping.csv"),
+    output_html="job_lineage_canvas.html",
+    initial_job="J002",  # optional
+)
+```
+
+- `lineage_canvas.py`: existing table graph API/database loader and shared safe,
+  atomic HTML output; CLI routes `--mode job` to the job generator.
+- `job_lineage.py`: CSV validation/normalization, job graph, cycle groups and layout.
+- `job_lineage_canvas_template.html`: dependency-free job UI and table-list dialog.
+- `lineage_canvas_template.html`: existing table explorer.
+- `tests/test_job_lineage.py`: graph, CSV, CLI, safety, and table export regression tests.
+- `tests/browser_job_lineage.js`: Playwright page function for the included sample;
+  verifies dialogs, keyboard controls, graph filters, CSV export, pan/zoom, and mobile layout.
+
+```bash
+python -m unittest discover -s tests -v
+```
 
 ## Requirements
 

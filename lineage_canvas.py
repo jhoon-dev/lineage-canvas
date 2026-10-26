@@ -323,6 +323,12 @@ def export_lineage_canvas_html(
         "data_updated_at": data_updated_at,
     }
 
+    _render_canvas_html(TEMPLATE_PATH, payload, title, output_html)
+    return clean_df
+
+
+def _render_canvas_html(template_path: Path, payload: dict, title: str, output_html: str):
+    """Shared safe embedding and atomic output for table and job canvases."""
     # The JSON is embedded in a script element. Escape HTML-significant
     # characters so a value such as </script> cannot terminate that element.
     payload_json = (
@@ -336,10 +342,10 @@ def export_lineage_canvas_html(
     safe_title = html.escape(title)
 
     try:
-        html_template = TEMPLATE_PATH.read_text(encoding="utf-8")
+        html_template = template_path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
         raise FileNotFoundError(
-            f"HTML 템플릿 파일을 찾을 수 없습니다: {TEMPLATE_PATH}"
+            f"HTML 템플릿 파일을 찾을 수 없습니다: {template_path}"
         ) from exc
 
     html_text = html_template.replace("__TITLE__", safe_title).replace("__PAYLOAD__", payload_json)
@@ -354,17 +360,37 @@ def export_lineage_canvas_html(
         temp_path.replace(output_path)
     finally:
         temp_path.unlink(missing_ok=True)
-    return clean_df
 
 
 # Backward-compatible alias for code written before the project rename.
 export_lineage_explorer_html = export_lineage_canvas_html
 
 
-if __name__ == "__main__":
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate a table or job LineageCanvas HTML file.")
+    parser.add_argument("--mode", choices=["table", "job"], default="table")
+    parser.add_argument("--input", help="Job CSV (default: job_table_mapping.csv)")
+    parser.add_argument("--output", help="Generated HTML path")
+    parser.add_argument("--initial-job", help="Initially selected job_id")
+    args = parser.parse_args()
     load_dotenv(ENV_PATH)
+    if args.mode == "job":
+        from job_lineage import export_job_lineage_canvas_html, load_job_mapping_csv
+
+        output_html = args.output or "job_lineage_canvas.html"
+        data = export_job_lineage_canvas_html(
+            load_job_mapping_csv(args.input or "job_table_mapping.csv"),
+            output_html=output_html,
+            initial_job=args.initial_job,
+        )
+        print(f"Created {Path(output_html).resolve()} ({len(data['jobs'])} jobs, {len(data['edges'])} edges)")
+        return
+    if args.input or args.initial_job:
+        parser.error("--input and --initial-job require --mode job")
     database_edges = load_edges_from_database()
-    output_html = os.getenv("OUTPUT_HTML", "lineage_canvas.html")
+    output_html = args.output or os.getenv("OUTPUT_HTML", "lineage_canvas.html")
     cleaned = export_lineage_canvas_html(
         edge_df=database_edges,
         output_html=output_html,
@@ -374,3 +400,7 @@ if __name__ == "__main__":
         title=os.getenv("PAGE_TITLE", "LineageCanvas"),
     )
     print(f"Created {Path(output_html).resolve()} ({len(cleaned)} edges)")
+
+
+if __name__ == "__main__":
+    main()

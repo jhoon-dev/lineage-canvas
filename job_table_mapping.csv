@@ -1,0 +1,25 @@
+job_id,job_name,table_name,relation_type
+J001,주문 수집,raw.orders,READ
+J001,주문 수집,raw.customers,READ
+J001,주문 수집,stg.orders,WRITE
+J001,주문 수집,stg.customers,WRITE
+J001,주문 수집,stg.products,WRITE
+J001,주문 수집,stg.payments,WRITE
+J001,주문 수집,stg.shipments,WRITE
+J002,매출 집계,stg.orders,READ
+J002,매출 집계,stg.customers,READ
+J002,매출 집계,stg.products,READ
+J002,매출 집계,stg.payments,READ
+J002,매출 집계,stg.shipments,READ
+J002,매출 집계,mart.sales_daily,WRITE
+J002,매출 집계,mart.sales_daily,WRITE
+J003,대시보드 생성,mart.sales_daily,READ
+J003,대시보드 생성,rpt.sales_dashboard,WRITE
+J004,고객 지표,mart.sales_daily,READ
+J004,고객 지표,mart.customer_metrics,WRITE
+J005,순환 예제 A,cycle.b,READ
+J005,순환 예제 A,cycle.a,WRITE
+J006,순환 예제 B,cycle.a,READ
+J006,순환 예제 B,cycle.b,WRITE
+J007,재고 갱신,ods.inventory,READ
+J007,재고 갱신,ods.inventory,WRITE
