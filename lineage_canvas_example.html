@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>LineageCanvas</title>
+<title>LineageCanvas · Table Lineage</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <style>
   :root {
@@ -81,6 +81,10 @@
     font-size: 19px;
     font-weight: 750;
     line-height: 1.25;
+  }
+
+  .title span {
+    color: var(--blue);
   }
 
   .subtitle {
@@ -951,7 +955,7 @@
 <div class="topbar">
   <div class="topbar-head">
     <div>
-      <h1 class="title">LineageCanvas</h1>
+      <h1 class="title">LineageCanvas <span>/ Table Lineage</span></h1>
       <div class="subtitle">Explore table lineage across reference and trigger relationships</div>
     </div>
     <div class="updated-at">Updated <strong id="dataUpdatedAt"></strong></div>

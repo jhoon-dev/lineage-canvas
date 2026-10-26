@@ -23,6 +23,16 @@ Database -> Python generator -> standalone HTML -> static web server
 
 The browser never connects to the database. Database access happens only while the Python generator is running.
 
+## Choose a mode
+
+```bash
+python lineage_canvas.py --mode job    # Job Lineage: CSV job/table mappings
+python lineage_canvas.py --mode table  # Table Lineage: database table relationships
+```
+
+The page heading and browser title identify **Job Lineage** or **Table Lineage**.
+Omitting `--mode` keeps the existing Table Lineage behavior.
+
 ## Job Lineage (CSV)
 
 Job Lineage uses the same Python → standalone HTML workflow, with a dedicated job graph.
@@ -277,7 +287,7 @@ Existing `MYSQL_*` variables from earlier versions remain supported for backward
 ## Generate the HTML
 
 ```bash
-python lineage_canvas.py
+python lineage_canvas.py --mode table
 ```
 
 The command prints the generated file path and number of lineage edges:

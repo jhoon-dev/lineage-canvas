@@ -135,6 +135,8 @@ class JobLineageTests(unittest.TestCase):
             self.assertGreater(len(clean), 0)
             self.assertIn("const PAYLOAD =", path.read_text(encoding="utf-8"))
             self.assertNotIn("__PAYLOAD__", path.read_text(encoding="utf-8"))
+            self.assertIn("<title>LineageCanvas · Table Lineage</title>", path.read_text(encoding="utf-8"))
+            self.assertIn("<span>/ Table Lineage</span>", path.read_text(encoding="utf-8"))
 
     def test_cli_default_job_input_and_legacy_compatibility_without_database(self):
         with tempfile.TemporaryDirectory() as tmp:

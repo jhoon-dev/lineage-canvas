@@ -370,7 +370,10 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate a table or job LineageCanvas HTML file.")
-    parser.add_argument("--mode", choices=["table", "job"], default="table")
+    parser.add_argument(
+        "--mode", choices=["job", "table"], default="table",
+        help="job: CSV Job Lineage; table: database Table Lineage (default)",
+    )
     parser.add_argument("--input", help="Job CSV (default: job_table_mapping.csv)")
     parser.add_argument("--output", help="Generated HTML path")
     parser.add_argument("--initial-job", help="Initially selected job_id")
