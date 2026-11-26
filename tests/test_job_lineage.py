@@ -1,10 +1,13 @@
+from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
+from threading import Barrier
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -106,12 +109,34 @@ class JobLineageTests(unittest.TestCase):
     def test_csv_preserves_zero_padded_ids_literal_na_unicode_and_commas(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "mapping.csv"
-            path.write_text('\ufeffjob_id,job_name,table_name,relation_type\n001,"한글, Job",NA,READ\n002,NA,"table,comma",WRITE\n', encoding="utf-8")
+            path.write_text(
+                '\ufeffjob_id,job_name,table_name,relation_type\n001,"한글,\nJob",NA,READ\n'
+                '002,NA,"table,comma",WRITE\n',
+                encoding="utf-8",
+                newline="",
+            )
             df = load_job_mapping_csv(path)
             self.assertEqual(df.iloc[0]["job_id"], "001")
+            self.assertEqual(df.iloc[0]["job_name"], "한글,\nJob")
             self.assertEqual(df.iloc[0]["table_name"], "NA")
             self.assertEqual(df.iloc[1]["job_name"], "NA")
             self.assertEqual(df.iloc[1]["table_name"], "table,comma")
+
+    def test_csv_rejects_duplicate_headers_and_wrong_field_counts(self):
+        header = "job_id,job_name,table_name,relation_type"
+        cases = [
+            (f"{header},job_id\nA,Job,t,WRITE,B\n", "중복 CSV 컬럼"),
+            (f"{header}, job_id \nA,Job,t,WRITE,B\n", "중복 CSV 컬럼"),
+            (f"{header}\nextra,A,Job,t,WRITE\n", "컬럼 수.*줄 2"),
+            (f'{header}\nA,"Multi\nline",t,READ\nB,Job,t\n', "컬럼 수.*줄 4"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "mapping.csv"
+            for content, message in cases:
+                with self.subTest(content=content):
+                    path.write_text(content, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, message):
+                        load_job_mapping_csv(path)
 
     def test_export_escapes_payload_and_title_and_preserves_previous_file_on_error(self):
         dangerous = '</script><img src=x onerror=alert(1)>&"\u2028end'
@@ -126,17 +151,68 @@ class JobLineageTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 export_job_lineage_canvas_html(mapping(), str(path), initial_job="missing")
             self.assertEqual(path.read_text(encoding="utf-8"), content)
-            self.assertFalse(path.with_name(".canvas.html.tmp").exists())
+            self.assertEqual(list(path.parent.iterdir()), [path])
+
+    def test_concurrent_exports_replace_from_independent_temporary_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "canvas.html"
+            replace = Path.replace
+            both_ready = Barrier(2)
+
+            def replace_together(source, target):
+                both_ready.wait(timeout=30)
+                return replace(source, target)
+
+            with patch.object(Path, "replace", replace_together), ThreadPoolExecutor(2) as workers:
+                exports = [
+                    workers.submit(
+                        export_job_lineage_canvas_html,
+                        mapping((job_id, job_id, "t", "WRITE")),
+                        str(path),
+                        title=job_id,
+                    )
+                    for job_id in ("A", "B")
+                ]
+                for export in exports:
+                    export.result()
+
+            content = path.read_text(encoding="utf-8")
+            payload = json.loads(re.search(r"const PAYLOAD = (.*);", content).group(1))
+            self.assertIn(payload["title"], ["A", "B"])
+            self.assertEqual(payload["data"]["jobs"][0]["id"], payload["title"])
+            self.assertEqual(list(path.parent.iterdir()), [path])
+
+    def test_failed_file_replacement_preserves_previous_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "canvas.html"
+            path.write_text("previous", encoding="utf-8")
+            with patch.object(Path, "replace", side_effect=PermissionError("output is locked")):
+                with self.assertRaises(PermissionError):
+                    export_job_lineage_canvas_html(mapping(), str(path))
+            self.assertEqual(path.read_text(encoding="utf-8"), "previous")
+            self.assertEqual(list(path.parent.iterdir()), [path])
 
     def test_existing_table_export_regression(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "table.html"
             clean = export_lineage_canvas_html(example_edges(), output_html=str(path))
             self.assertGreater(len(clean), 0)
-            self.assertIn("const PAYLOAD =", path.read_text(encoding="utf-8"))
-            self.assertNotIn("__PAYLOAD__", path.read_text(encoding="utf-8"))
-            self.assertIn("<title>LineageCanvas · Table Lineage</title>", path.read_text(encoding="utf-8"))
-            self.assertIn("<span>/ Table Lineage</span>", path.read_text(encoding="utf-8"))
+            content = path.read_text(encoding="utf-8")
+            self.assertIn("const PAYLOAD =", content)
+            self.assertNotIn("__PAYLOAD__", content)
+            self.assertIn("<title>LineageCanvas · Table Lineage</title>", content)
+            self.assertIn("<span>/ Table Lineage</span>", content)
+            self.assertIn("Apache License", content)
+            self.assertNotIn("__SHEETJS__", content)
+            self.assertNotRegex(content, r"<script\s+src=")
+
+    def test_unknown_initial_table_preserves_previous_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "table.html"
+            path.write_text("previous", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, r"initial_table: stale\.orders"):
+                export_lineage_canvas_html(example_edges(), str(path), initial_table="stale.orders")
+            self.assertEqual(path.read_text(encoding="utf-8"), "previous")
 
     def test_cli_default_job_input_and_legacy_compatibility_without_database(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -3,3 +3,4 @@
 __pycache__/
 *.py[cod]
 .*.html.tmp
+.lineage-canvas-*/

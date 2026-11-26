@@ -7,6 +7,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Optional
 
 import pandas as pd
@@ -17,6 +18,7 @@ from sqlalchemy.engine import URL, make_url
 
 TEMPLATE_PATH = Path(__file__).resolve().with_name("lineage_canvas_template.html")
 ENV_PATH = Path(__file__).resolve().with_name(".env")
+SHEETJS_DIR = TEMPLATE_PATH.parent / "vendor" / "sheetjs"
 
 
 def _required_env(name: str) -> str:
@@ -298,7 +300,7 @@ def export_lineage_canvas_html(
     )["edge_count"].sum()
     data = build_adjacency(clean_df)
 
-    if initial_table is None:
+    if not initial_table:
         candidates = [
             t for t in data["tables"]
             if data["table_stats"][t]["parent_count"] > 0
@@ -310,6 +312,8 @@ def export_lineage_canvas_html(
             initial_table = data["tables"][0]
         else:
             initial_table = ""
+    elif initial_table not in data["table_stats"]:
+        raise ValueError(f"존재하지 않는 initial_table: {initial_table}")
 
     if data_updated_at is None:
         data_updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -339,8 +343,6 @@ def _render_canvas_html(template_path: Path, payload: dict, title: str, output_h
         .replace("\u2028", "\\u2028")
         .replace("\u2029", "\\u2029")
     )
-    safe_title = html.escape(title)
-
     try:
         html_template = template_path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
@@ -348,18 +350,23 @@ def _render_canvas_html(template_path: Path, payload: dict, title: str, output_h
             f"HTML 템플릿 파일을 찾을 수 없습니다: {template_path}"
         ) from exc
 
-    html_text = html_template.replace("__TITLE__", safe_title).replace("__PAYLOAD__", payload_json)
+    replacements = {"__TITLE__": html.escape(title), "__PAYLOAD__": payload_json}
+    if "__SHEETJS__" in html_template:
+        sheetjs = (SHEETJS_DIR / "xlsx.mini.min.js").read_text(encoding="utf-8")
+        # Escape the HTML comment openers in the vendored script's string literals.
+        sheetjs = sheetjs.replace("<!--", r"\x3c!--")
+        license_text = (SHEETJS_DIR / "LICENSE").read_text(encoding="utf-8").rstrip()
+        replacements["__SHEETJS__"] = f"/*\n{license_text}\n*/\n{sheetjs}"
+    html_text = re.sub("|".join(replacements), lambda match: replacements[match[0]], html_template)
 
     # Write completely before replacing the public file. If generation fails,
     # the previously generated HTML remains intact.
     output_path = Path(output_html).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = output_path.with_name(f".{output_path.name}.tmp")
-    try:
+    with TemporaryDirectory(dir=output_path.parent, prefix=".lineage-canvas-") as temp_dir:
+        temp_path = Path(temp_dir) / output_path.name
         temp_path.write_text(html_text, encoding="utf-8")
         temp_path.replace(output_path)
-    finally:
-        temp_path.unlink(missing_ok=True)
 
 
 # Backward-compatible alias for code written before the project rename.

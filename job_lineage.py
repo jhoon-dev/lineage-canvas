@@ -1,6 +1,7 @@
 """Normalize job/table mappings and derive deterministic, cycle-aware job lineage."""
 from __future__ import annotations
 
+import csv
 from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
@@ -15,8 +16,23 @@ TEMPLATE_PATH = Path(__file__).with_name("job_lineage_canvas_template.html")
 
 
 def load_job_mapping_csv(path: str | Path = "job_table_mapping.csv") -> pd.DataFrame:
-    # Preserve literal identifiers such as 001, NA and NULL; accept an Excel UTF-8 BOM.
-    return normalize_job_mapping(pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig"))
+    # Keep the original headers and field counts for validation, as well as literal IDs.
+    with Path(path).open(encoding="utf-8-sig", newline="") as source:
+        reader = csv.reader(source, strict=True)
+        records = (row for row in reader if row)
+        try:
+            columns = next(records, [])
+            rows = []
+            for row in records:
+                if len(row) != len(columns):
+                    raise ValueError(
+                        f"CSV 레코드의 컬럼 수가 일치하지 않습니다 (줄 {reader.line_num}): "
+                        f"{len(columns)}개 필요, {len(row)}개 입력"
+                    )
+                rows.append(row)
+        except csv.Error as exc:
+            raise ValueError(f"잘못된 CSV 형식 (줄 {reader.line_num}): {exc}") from exc
+    return normalize_job_mapping(pd.DataFrame(rows, columns=columns))
 
 
 def normalize_job_mapping(frame: pd.DataFrame) -> pd.DataFrame:

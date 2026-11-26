@@ -47,7 +47,8 @@ const search = document.getElementById('search'), results = document.getElementB
 const dialog = document.getElementById('table-dialog');
 const W = 350, H = 190, COL = 550, ROW = 235;
 let selected = PAYLOAD.initial_job || null, visible = new Set(jobs.keys());
-let view = {x:40,y:40,scale:1}, drag = null, suppressClick = false;
+const MIN_ZOOM = .03;
+let view = {x:40,y:40,scale:1,minScale:MIN_ZOOM}, drag = null, suppressClick = false;
 const position = job => ({x:job.level * COL, y:job.row * ROW});
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const shorten = (s,n=22) => {let width=0,result='';for(const c of s){width+=c.codePointAt(0)>255?2:1;if(width>n-1)return result+'…';result+=c}return result};
@@ -59,12 +60,15 @@ function fit(){
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   for(const id of visible){const p=position(jobs.get(id));minX=Math.min(minX,p.x-100);minY=Math.min(minY,p.y-30);maxX=Math.max(maxX,p.x+W+100);maxY=Math.max(maxY,p.y+H+30)}
   const r=svg.getBoundingClientRect();
-  view.scale=Math.max(.03,Math.min(1,(r.width-60)/(maxX-minX),(r.height-70)/(maxY-minY)));
+  if(!r.width||!r.height)return;
+  const availableWidth=r.width-Math.min(60,r.width/2),availableHeight=r.height-Math.min(70,r.height/2);
+  view.scale=Math.min(1,availableWidth/(maxX-minX),availableHeight/(maxY-minY));
+  view.minScale=Math.min(MIN_ZOOM,view.scale);
   view.x=(r.width-(maxX-minX)*view.scale)/2-minX*view.scale;
   view.y=(r.height-(maxY-minY)*view.scale)/2-minY*view.scale;applyView();
 }
 function zoom(factor,x=svg.clientWidth/2,y=svg.clientHeight/2){
-  const scale=Math.max(.03,Math.min(2.5,view.scale*factor));
+  const scale=Math.max(view.minScale,Math.min(2.5,view.scale*factor));
   view.x=x-(x-view.x)*scale/view.scale;view.y=y-(y-view.y)*scale/view.scale;view.scale=scale;applyView();
 }
 function collect(id,direction){

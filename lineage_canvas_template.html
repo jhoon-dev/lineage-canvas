@@ -4,7 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>__TITLE__ · Table Lineage</title>
-<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script>
+__SHEETJS__
+</script>
 <style>
   :root {
     color-scheme: light;
@@ -2170,7 +2172,7 @@ function parentChildListRows() {
 
 function writeWorkbook(filename, sheets) {
   if (typeof XLSX === 'undefined') {
-    alert('SheetJS(XLSX) library is not loaded. Check network access to cdn.sheetjs.com.');
+    alert('The embedded XLSX library could not be loaded.');
     return;
   }
 

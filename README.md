@@ -10,8 +10,8 @@ LineageCanvas reads table relationships through SQLAlchemy, builds upstream and 
 - Interactive upstream and downstream lineage graph
 - Reference and trigger relationship filters
 - Search, autocomplete, expand, collapse, pan, zoom, and minimap controls
-- CSV export of graph and relationship data
-- Standalone HTML output with no runtime database connection
+- CSV mapping export in Job Lineage and XLSX graph export in Table Lineage
+- Standalone HTML output that works offline, including exports
 - `.env`-based configuration
 - Atomic output replacement so a failed build preserves the last valid page
 
@@ -78,6 +78,8 @@ J002,Aggregate sales,mart.sales_daily,WRITE
   with inconsistent names raises an error instead of silently merging jobs.
 - Use UTF-8 (an Excel BOM is accepted). CSV quoting supports commas and newlines;
   IDs such as `001` and literal names such as `NA` are preserved.
+- Header names must be unique, and every record must have the same number of
+  fields as the header.
 
 ### Legacy input
 
@@ -280,7 +282,7 @@ MAX_NEIGHBORS_PER_CLICK=80
 UPSTREAM_AUTO_DEPTH=12
 ```
 
-`INITIAL_TABLE` is optional. When omitted, LineageCanvas selects a suitable root table automatically.
+`INITIAL_TABLE` is optional. When omitted, LineageCanvas selects a suitable root table automatically. A configured name must exactly match one of the tables in the lineage graph.
 
 Existing `MYSQL_*` variables from earlier versions remain supported for backward compatibility, but new configurations should use `DB_*` and `LINEAGE_*`.
 
@@ -341,3 +343,4 @@ export_lineage_canvas_html(
 ## License
 
 LineageCanvas is available under the [MIT License](LICENSE).
+Table Lineage embeds the [SheetJS Community Edition 0.20.3 mini build](https://docs.sheetjs.com/docs/getting-started/installation/standalone/) for offline XLSX export. The [Apache 2.0 license](vendor/sheetjs/LICENSE) ships with the repository and is included in generated Table Lineage HTML.
