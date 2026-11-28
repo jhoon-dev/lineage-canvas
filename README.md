@@ -137,6 +137,21 @@ data = export_job_lineage_canvas_html(
 python -m unittest discover -s tests -v
 ```
 
+The database tests cover dialect-specific identifier quoting and SQLite queries.
+To include the Table Lineage browser regression tests, install the development
+dependencies and Chromium first:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m playwright install chromium
+python -m unittest discover -s tests -v
+```
+
+The browser tests open generated HTML directly from disk and check direction
+filters, incremental neighbor loading, collapse/reset behavior, large-graph fit
+on desktop and mobile, and offline XLSX generation. They are skipped when the
+optional Playwright package is not installed.
+
 ## Requirements
 
 - Python 3.10 or newer
@@ -283,6 +298,18 @@ UPSTREAM_AUTO_DEPTH=12
 ```
 
 `INITIAL_TABLE` is optional. When omitted, LineageCanvas selects a suitable root table automatically. A configured name must exactly match one of the tables in the lineage graph.
+
+`MAX_NEIGHBORS_PER_CLICK` controls the batch size for each direction and relation
+type. When a node has more matching relationships, click it again (or press
+Enter/Space) to load another batch. Once all matching relationships are visible,
+the next activation collapses it. Filters preserve the loaded batches;
+collapsing a node or resetting the graph starts its batches over. **Fit graph**
+can zoom below the usual minimum scale to keep all visible nodes on screen.
+
+Database identifiers use SQLAlchemy's dialect-specific quoting rules. Ordinary
+lowercase names, including the defaults, are unquoted so databases such as
+Oracle can apply their normal case folding. Reserved words and mixed-case names
+are quoted automatically; use the exact spelling for case-sensitive objects.
 
 Existing `MYSQL_*` variables from earlier versions remain supported for backward compatibility, but new configurations should use `DB_*` and `LINEAGE_*`.
 

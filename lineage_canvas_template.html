@@ -1030,7 +1030,7 @@ __SHEETJS__
 </div>
 <main id="chart-wrap" aria-label="Interactive table lineage graph">
   <svg id="chart" role="img" aria-label="Interactive table lineage graph" aria-describedby="graphDescription">
-    <desc id="graphDescription">Use the mouse to pan and zoom. Select a table node to expand or collapse its relationships.</desc>
+    <desc id="graphDescription">Use the mouse to pan and zoom. Activate a table node to load more relationships, or collapse it when complete.</desc>
     <g id="viewport"></g>
   </svg>
   <div class="graph-legend" aria-label="Relationship legend">
@@ -1044,7 +1044,7 @@ __SHEETJS__
   </div>
   <div id="copyToast" class="copy-toast" role="status" aria-live="polite"></div>
   <div id="nodeTooltip" class="node-tooltip" role="tooltip"></div>
-  <div class="help"><kbd>Drag</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>Click</kbd> expand/collapse · <kbd>Shift+Click</kbd> copy name · <kbd>Ctrl/Cmd+C</kbd> copy selected · <kbd>Ctrl+Click</kbd> new root · <kbd>Double-click</kbd> expand upstream</div>
+  <div class="help"><kbd>Drag</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>Click</kbd> load more / collapse · <kbd>Shift+Click</kbd> copy name · <kbd>Ctrl/Cmd+C</kbd> copy selected · <kbd>Ctrl+Click</kbd> new root · <kbd>Double-click</kbd> expand upstream</div>
 </main>
 
 <script>
@@ -1063,6 +1063,7 @@ let visibleEdges = new Map();
 let expandedNodes = new Set();
 let upstreamExpandedNodes = new Set();
 let downstreamExpandedNodes = new Set();
+let neighborLimits = new Map();
 let nodePos = new Map();
 let nodeKind = new Map();
 
@@ -1090,7 +1091,8 @@ const ROW_GAP = 92;
 const ROOT_X = 0;
 const ROOT_Y = 0;
 
-let view = { x: 0, y: 0, scale: 1 };
+const MIN_ZOOM = 0.15;
+let view = { x: 0, y: 0, scale: 1, minScale: MIN_ZOOM };
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let viewStart = { x: 0, y: 0 };
@@ -1115,7 +1117,7 @@ function zoomAt(clientX, clientY, factor) {
   const py = clientY - rect.top;
   const beforeX = (px - view.x) / view.scale;
   const beforeY = (py - view.y) / view.scale;
-  view.scale = Math.max(0.15, Math.min(3.5, view.scale * factor));
+  view.scale = Math.max(view.minScale, Math.min(3.5, view.scale * factor));
   view.x = px - beforeX * view.scale;
   view.y = py - beforeY * view.scale;
   applyView();
@@ -1123,13 +1125,15 @@ function zoomAt(clientX, clientY, factor) {
 
 function fitGraph() {
   const rect = svg.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
   const bounds = graphBounds();
   const padding = Math.min(90, Math.max(36, Math.min(rect.width, rect.height) * 0.1));
   const graphWidth = Math.max(1, bounds.maxX - bounds.minX);
   const graphHeight = Math.max(1, bounds.maxY - bounds.minY);
   const availableWidth = Math.max(1, rect.width - padding * 2);
   const availableHeight = Math.max(1, rect.height - padding * 2);
-  const scale = Math.max(0.2, Math.min(1, availableWidth / graphWidth, availableHeight / graphHeight));
+  const scale = Math.min(1, availableWidth / graphWidth, availableHeight / graphHeight);
+  view.minScale = Math.min(MIN_ZOOM, scale);
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
   setViewToCenter(centerX, centerY, scale);
@@ -1493,6 +1497,8 @@ function startNewRoot(table) {
   expandedNodes = new Set();
   upstreamExpandedNodes = new Set();
   downstreamExpandedNodes = new Set();
+  neighborLimits = new Map();
+  view.minScale = MIN_ZOOM;
   nodePos = new Map([[table, {x: ROOT_X, y: ROOT_Y, w: NODE_W, h: NODE_H}]]);
   nodeKind = new Map([[table, 'root']]);
 
@@ -1554,12 +1560,30 @@ function syncExpandedNodes() {
   expandedNodes = new Set([...upstreamExpandedNodes, ...downstreamExpandedNodes]);
 }
 
+function expandedNeighbors(table, direction, relation, advance=false) {
+  const neighbors = direction === 'upstream'
+    ? relationParents(table, relation) : relationChildren(table, relation);
+  if (!neighborLimits.has(table)) neighborLimits.set(table, {upstream: {}, downstream: {}});
+  const limits = neighborLimits.get(table)[direction];
+  const previous = limits[relation] || 0;
+  const limit = advance ? previous + MAX_NEIGHBORS : previous || MAX_NEIGHBORS;
+  limits[relation] = Math.min(neighbors.length, limit);
+  return neighbors.slice(0, limits[relation]);
+}
+
 function expandNodeDirection(table, direction, trackState=true) {
   if (!table || !DATA.tables.includes(table)) return;
 
+  // Record intent even when a direction or all relations are filtered out.
+  if (trackState) {
+    if (direction === 'upstream') upstreamExpandedNodes.add(table);
+    if (direction === 'downstream') downstreamExpandedNodes.add(table);
+    syncExpandedNodes();
+  }
+
   for (const relation of activeRelations()) {
     if (direction === 'upstream' && showParentsEl.checked) {
-      const parents = relationParents(table, relation).slice(0, MAX_NEIGHBORS);
+      const parents = expandedNeighbors(table, direction, relation, trackState);
       parents.forEach((p, i) => {
         placeNeighbor(table, p.table, 'parent', i, parents.length);
         addOrUpdateKind(p.table, 'parent');
@@ -1568,7 +1592,7 @@ function expandNodeDirection(table, direction, trackState=true) {
     }
 
     if (direction === 'downstream' && showChildrenEl.checked) {
-      const children = relationChildren(table, relation).slice(0, MAX_NEIGHBORS);
+      const children = expandedNeighbors(table, direction, relation, trackState);
       children.forEach((c, i) => {
         placeNeighbor(table, c.table, 'child', i, children.length);
         addOrUpdateKind(c.table, 'child');
@@ -1578,18 +1602,13 @@ function expandNodeDirection(table, direction, trackState=true) {
   }
 
   visibleNodes.add(table);
-  if (trackState) {
-    if (direction === 'upstream' && showParentsEl.checked) upstreamExpandedNodes.add(table);
-    if (direction === 'downstream' && showChildrenEl.checked) downstreamExpandedNodes.add(table);
-    syncExpandedNodes();
-  }
 }
 
 function expandNode(table) {
   if (!table || !DATA.tables.includes(table)) return;
   selectedTable = table;
-  if (showParentsEl.checked) expandNodeDirection(table, 'upstream');
-  if (showChildrenEl.checked) expandNodeDirection(table, 'downstream');
+  expandNodeDirection(table, 'upstream');
+  expandNodeDirection(table, 'downstream');
 }
 
 function expandUpstream(table, maxDepth=AUTO_DEPTH) {
@@ -1603,7 +1622,7 @@ function expandUpstream(table, maxDepth=AUTO_DEPTH) {
     const item = queue.shift();
 
     for (const relation of activeRelations()) {
-      const parents = relationParents(item.table, relation).slice(0, MAX_NEIGHBORS);
+      const parents = expandedNeighbors(item.table, 'upstream', relation, true);
       parents.forEach((p, i) => {
         placeNeighbor(item.table, p.table, 'parent', i, parents.length);
         addOrUpdateKind(p.table, 'parent');
@@ -1658,6 +1677,7 @@ function collapseNode(table) {
   if (!expandedNodes.has(table)) return;
   upstreamExpandedNodes.delete(table);
   downstreamExpandedNodes.delete(table);
+  neighborLimits.delete(table);
   syncExpandedNodes();
   rebuildFromExpandedKeepPositions();
   selectedTable = visibleNodes.has(table) ? table : rootTable;
@@ -1667,6 +1687,7 @@ function collapseAll() {
   const collapsedCount = expandedNodes.size;
   upstreamExpandedNodes.clear();
   downstreamExpandedNodes.clear();
+  neighborLimits.clear();
   syncExpandedNodes();
   rebuildFromExpandedKeepPositions();
   selectedTable = rootTable;
@@ -1690,7 +1711,7 @@ function pruneInvisibleOnly() {
 
 function toggleNode(table) {
   selectedTable = table;
-  if (expandedNodes.has(table)) {
+  if (expandedNodes.has(table) && unexpandedCount(table) === 0) {
     collapseNode(table);
   } else {
     if (!nodePos.has(table)) {
@@ -1717,10 +1738,10 @@ function isSelectedEdge(e) {
 function unexpandedCount(table) {
   let cnt = 0;
   for (const relation of activeRelations()) {
-    for (const p of relationParents(table, relation)) {
+    for (const p of showParentsEl.checked ? relationParents(table, relation) : []) {
       if (!visibleEdges.has(edgeKey(p.table, table, relation))) cnt++;
     }
-    for (const c of relationChildren(table, relation)) {
+    for (const c of showChildrenEl.checked ? relationChildren(table, relation) : []) {
       if (!visibleEdges.has(edgeKey(table, c.table, relation))) cnt++;
     }
   }
@@ -1781,7 +1802,7 @@ ${tooltipList(triggerParents, 25)}
 ${tooltipList(triggerChildren, 25)}
 
 ` +
-    `Click: expand/collapse
+    `Click: load more neighbors, or collapse when complete
 ` +
     `Shift+click: copy full name
 ` +
@@ -1868,7 +1889,7 @@ function nodeHTML(table, p) {
     : '';
 
   return `
-    <g class="node ${kind}${expandedCls}${selectedCls} type-${ttype}" transform="translate(${p.x},${p.y})" data-table="${escapeXml(table)}" role="button" tabindex="0" aria-label="${escapeXml(table)} table. Press Enter to expand or collapse. Shift click to copy the full name.">
+    <g class="node ${kind}${expandedCls}${selectedCls} type-${ttype}" transform="translate(${p.x},${p.y})" data-table="${escapeXml(table)}" role="button" tabindex="0" aria-label="${escapeXml(table)} table. Press Enter to load more neighbors, or collapse when complete. Shift click to copy the full name.">
       <rect x="${-p.w/2}" y="${-p.h/2}" width="${p.w}" height="${p.h}"></rect>
       ${badge}
       <text class="table-name" x="0" y="-19" text-anchor="middle">${escapeXml(label)}</text>

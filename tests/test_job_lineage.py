@@ -5,7 +5,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from threading import Barrier
+from threading import Barrier, local
 import unittest
 from unittest.mock import patch
 
@@ -158,9 +158,14 @@ class JobLineageTests(unittest.TestCase):
             path = Path(tmp) / "canvas.html"
             replace = Path.replace
             both_ready = Barrier(2)
+            worker = local()
 
             def replace_together(source, target):
-                both_ready.wait(timeout=30)
+                # Synchronize the first attempt; a Windows lock retry must not
+                # wait for an exporter that has already finished successfully.
+                if not getattr(worker, "ready", False):
+                    worker.ready = True
+                    both_ready.wait(timeout=30)
                 return replace(source, target)
 
             with patch.object(Path, "replace", replace_together), ThreadPoolExecutor(2) as workers:
@@ -180,6 +185,42 @@ class JobLineageTests(unittest.TestCase):
             payload = json.loads(re.search(r"const PAYLOAD = (.*);", content).group(1))
             self.assertIn(payload["title"], ["A", "B"])
             self.assertEqual(payload["data"]["jobs"][0]["id"], payload["title"])
+            self.assertEqual(list(path.parent.iterdir()), [path])
+
+    def test_transient_windows_output_locks_are_retried(self):
+        replace = Path.replace
+        for code in [5, 32, 33]:
+            with self.subTest(winerror=code), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "canvas.html"
+                path.write_text("previous", encoding="utf-8")
+                attempts = 0
+                locked = PermissionError("temporary Windows output lock")
+                locked.winerror = code
+
+                def locked_once(source, target):
+                    nonlocal attempts
+                    attempts += 1
+                    if attempts == 1:
+                        raise locked
+                    return replace(source, target)
+
+                with patch.object(Path, "replace", locked_once), patch("lineage_canvas.sleep"):
+                    export_job_lineage_canvas_html(mapping(), str(path))
+                self.assertGreater(attempts, 1)
+                self.assertIn("const PAYLOAD =", path.read_text(encoding="utf-8"))
+                self.assertEqual(list(path.parent.iterdir()), [path])
+
+    def test_persistent_windows_output_lock_preserves_previous_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "canvas.html"
+            path.write_text("previous", encoding="utf-8")
+            locked = PermissionError("persistent Windows output lock")
+            locked.winerror = 32
+            with patch.object(Path, "replace", side_effect=locked) as replace, patch("lineage_canvas.sleep"):
+                with self.assertRaises(PermissionError):
+                    export_job_lineage_canvas_html(mapping(), str(path))
+            self.assertGreater(replace.call_count, 1)
+            self.assertEqual(path.read_text(encoding="utf-8"), "previous")
             self.assertEqual(list(path.parent.iterdir()), [path])
 
     def test_failed_file_replacement_preserves_previous_output(self):

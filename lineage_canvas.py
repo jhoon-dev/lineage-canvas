@@ -8,6 +8,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from time import sleep
 from typing import Optional
 
 import pandas as pd
@@ -33,7 +34,9 @@ def _quote_identifier(identifier: str, engine) -> str:
     parts = identifier.split(".")
     if not parts or any(not re.fullmatch(r"[A-Za-z0-9_$]+", part) for part in parts):
         raise ValueError(f"허용되지 않는 DB 식별자입니다: {identifier!r}")
-    quote = engine.dialect.identifier_preparer.quote_identifier
+    # Let the dialect fold ordinary names (notably Oracle's unquoted names)
+    # while still quoting reserved words, mixed case, and numeric identifiers.
+    quote = engine.dialect.identifier_preparer.quote
     return ".".join(quote(part) for part in parts)
 
 
@@ -366,7 +369,17 @@ def _render_canvas_html(template_path: Path, payload: dict, title: str, output_h
     with TemporaryDirectory(dir=output_path.parent, prefix=".lineage-canvas-") as temp_dir:
         temp_path = Path(temp_dir) / output_path.name
         temp_path.write_text(html_text, encoding="utf-8")
-        temp_path.replace(output_path)
+        for attempt in range(4):
+            try:
+                temp_path.replace(output_path)
+                break
+            except PermissionError as exc:
+                # Concurrent MoveFileEx operations can briefly lock the target
+                # on Windows. Retry only Windows access/sharing/lock errors;
+                # persistent failures still leave the previous page untouched.
+                if getattr(exc, "winerror", None) not in {5, 32, 33} or attempt == 3:
+                    raise
+                sleep(0.01 * 2 ** attempt)
 
 
 # Backward-compatible alias for code written before the project rename.
